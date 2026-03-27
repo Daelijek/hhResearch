@@ -1,0 +1,10 @@
+reports
+frontend
+.git
+.cursor
+__pycache__
+*.pyc
+.env
+.env.*
+node_modules
+README.md
