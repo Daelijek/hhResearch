@@ -11,6 +11,7 @@ from collections import Counter
 from hh_research.client import VacancyRef, fetch_vacancy, search_vacancies
 from hh_research.excel_export import (
     create_export_workbook,
+    finalize_export_sheet,
     find_next_row_after_max,
     extract_skills_and_keywords,
     write_vacancy_row_aligned,
@@ -79,6 +80,8 @@ def run_export_on_worksheet(
     kw_max_ngram: int,
     sleep_s: float,
     on_progress: Optional[Callable[[int, int], None]] = None,
+    *,
+    format_headers: bool = True,
 ) -> Tuple[int, int, List[str], Dict[str, Any]]:
     """
     Fetches each vacancy and appends blocks to ws starting at next_row.
@@ -139,6 +142,18 @@ def run_export_on_worksheet(
             time.sleep(sleep_s)
         if on_progress and processed % 10 == 0:
             on_progress(processed, total)
+
+    finalize_export_sheet(
+        ws,
+        col_title,
+        col_keywords,
+        col_skills,
+        col_id,
+        col_link,
+        header_row=1,
+        data_start_row=None,
+        style_headers=format_headers,
+    )
 
     reason_counter: Counter[str] = Counter()
     for msg in errors:
@@ -247,6 +262,7 @@ def append_refs_to_template_file(
         kw_max_ngram=kw_max_ngram,
         sleep_s=sleep_s,
         on_progress=on_progress,
+        format_headers=False,
     )
     wb.save(out_path)
     return processed, next_row_after, errors

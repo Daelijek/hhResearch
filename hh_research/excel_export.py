@@ -1,9 +1,32 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from openpyxl import Workbook
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from hh_research.keywords import extract_keywords_simple, extract_text_from_html
+
+# Approximate column widths (openpyxl units ≈ character count)
+DEFAULT_COL_WIDTHS: dict[int, float] = {
+    1: 42.0,  # title
+    2: 32.0,  # keywords
+    3: 32.0,  # skills
+    4: 14.0,  # id
+    5: 48.0,  # link
+}
+
+# Header: bold 12pt, each column own background (Excel-style palette, white text)
+HEADER_FILLS: dict[int, str] = {
+    1: "4472C4",  # blue
+    2: "ED7D31",  # orange
+    3: "70AD47",  # green
+    4: "7030A0",  # purple
+    5: "00B0F0",  # cyan
+}
+
+DUPLICATE_FILL_HEX = "C6EFCE"  # light green (Excel-style) for repeated values
 
 
 def extract_skills_and_keywords(
@@ -51,6 +74,113 @@ def create_export_workbook(sheet_name: str = "Sheet1") -> Tuple[Workbook, Worksh
     ws.cell(1, 4, "ID")
     ws.cell(1, 5, "Link")
     return wb, ws
+
+
+def style_export_column_widths(
+    ws: Worksheet,
+    col_title: int,
+    col_keywords: int,
+    col_skills: int,
+    col_id: int,
+    col_link: int,
+) -> None:
+    mapping = {
+        col_title: DEFAULT_COL_WIDTHS[1],
+        col_keywords: DEFAULT_COL_WIDTHS[2],
+        col_skills: DEFAULT_COL_WIDTHS[3],
+        col_id: DEFAULT_COL_WIDTHS[4],
+        col_link: DEFAULT_COL_WIDTHS[5],
+    }
+    for col_idx, w in mapping.items():
+        ws.column_dimensions[get_column_letter(col_idx)].width = w
+
+
+def style_export_header_row(
+    ws: Worksheet,
+    header_row: int,
+    col_title: int,
+    col_keywords: int,
+    col_skills: int,
+    col_id: int,
+    col_link: int,
+) -> None:
+    cols = (col_title, col_keywords, col_skills, col_id, col_link)
+    font = Font(bold=True, size=12, color="FFFFFF")
+    align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for i, c in enumerate(cols, start=1):
+        cell = ws.cell(header_row, c)
+        fill_hex = HEADER_FILLS.get(i, "4472C4")
+        cell.font = font
+        cell.fill = PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
+        cell.alignment = align
+    ws.row_dimensions[header_row].height = 22
+
+
+def _first_data_row(ws: Worksheet, header_row: int, cols: Tuple[int, ...]) -> int:
+    """Row index of first cell with content below header (for CF range)."""
+    last = ws.max_row or header_row
+    for r in range(header_row + 1, last + 1):
+        for c in cols:
+            v = ws.cell(r, c).value
+            if v is not None and str(v).strip():
+                return r
+    return header_row + 1
+
+
+def apply_duplicate_cell_highlight(
+    ws: Worksheet,
+    col_idx: int,
+    start_row: int,
+    end_row: int,
+) -> None:
+    if end_row < start_row:
+        return
+    col = get_column_letter(col_idx)
+    cell_range = f"{col}{start_row}:{col}{end_row}"
+    fill = PatternFill(
+        start_color=DUPLICATE_FILL_HEX,
+        end_color=DUPLICATE_FILL_HEX,
+        fill_type="solid",
+    )
+    # Highlight cell if the same value appears more than once in this column (non-empty)
+    formula = f'AND({col}{start_row}<>"",COUNTIF(${col}${start_row}:${col}${end_row},{col}{start_row})>1)'
+    rule = FormulaRule(formula=[formula], fill=fill)
+    ws.conditional_formatting.add(cell_range, rule)
+
+
+def finalize_export_sheet(
+    ws: Worksheet,
+    col_title: int,
+    col_keywords: int,
+    col_skills: int,
+    col_id: int,
+    col_link: int,
+    *,
+    header_row: int = 1,
+    data_start_row: Optional[int] = None,
+    style_headers: bool = True,
+) -> None:
+    style_export_column_widths(ws, col_title, col_keywords, col_skills, col_id, col_link)
+    if style_headers:
+        style_export_header_row(
+            ws, header_row, col_title, col_keywords, col_skills, col_id, col_link
+        )
+    cols_scan = (col_title, col_keywords, col_skills, col_id, col_link)
+    data_row = (
+        data_start_row
+        if data_start_row is not None
+        else _first_data_row(ws, header_row, cols_scan)
+    )
+    max_r = ws.max_row or data_row
+    if max_r >= data_row:
+        apply_duplicate_cell_highlight(ws, col_keywords, data_row, max_r)
+        apply_duplicate_cell_highlight(ws, col_skills, data_row, max_r)
+    ws.freeze_panes = ws.cell(data_row, 1).coordinate
+    lo = min(cols_scan)
+    hi = max(cols_scan)
+    for row in ws.iter_rows(min_row=data_row, max_row=max_r, min_col=lo, max_col=hi):
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
 def find_next_row_after_max(ws: Worksheet, col: int, start_row: int = 2) -> int:
