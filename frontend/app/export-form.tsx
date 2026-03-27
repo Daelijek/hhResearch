@@ -379,7 +379,7 @@ export function ExportForm({
       <button
         type="submit"
         disabled={busy}
-        className="btn-primary px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
         {busy ? t("form.btnBusy") : t("form.btnReady")}
       </button>

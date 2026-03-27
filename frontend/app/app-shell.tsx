@@ -9,13 +9,13 @@ function LanguageSwitch() {
 
   const options: Lang[] = ["en", "ru", "kk"];
   return (
-    <div className="surface-glass-sm flex items-center gap-1 p-1 text-xs shadow-glassSoft">
+    <div className="surface-glass-sm flex shrink-0 items-center gap-0.5 p-1 text-[10px] shadow-glassSoft sm:gap-1 sm:text-xs">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => setLang(opt)}
-          className={`rounded-md px-2 py-1 transition ${lang === opt ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
+          className={`inline-flex items-center justify-center rounded-md px-2 py-1 leading-none transition sm:px-2.5 sm:py-1.5 ${lang === opt ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
             }`}
           aria-label={`Switch to ${opt}`}
         >
@@ -32,11 +32,13 @@ function ThemeSwitch() {
     <button
       type="button"
       onClick={toggle}
-      className="btn-soft inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-[var(--text)]"
+      className="btn-soft inline-flex shrink-0 items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-semibold leading-none text-[var(--text)] sm:gap-2 sm:px-3 sm:py-2.5"
       aria-label="Toggle theme"
       title={theme === "dark" ? "Switch to light" : "Switch to dark"}
     >
-      <span aria-hidden>{theme === "dark" ? "🌙" : "☀️"}</span>
+      <span aria-hidden className="text-base leading-none sm:text-sm">
+        {theme === "dark" ? "🌙" : "☀️"}
+      </span>
       <span className="hidden sm:inline">{theme === "dark" ? "Dark" : "Light"}</span>
     </button>
   );
@@ -48,22 +50,31 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <header className="bar-glass sticky top-0 z-40 border-b">
-        <div className="container-shell flex h-20 items-center justify-between gap-3">
-          <Link href="/" className="text-xl font-semibold tracking-tight text-[var(--text)] transition hover:text-[var(--primary)]">
+        <div className="container-shell flex h-16 min-h-16 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:h-20 sm:min-h-20 sm:gap-3 sm:py-0 md:h-[5.25rem] md:min-h-[5.25rem] [&::-webkit-scrollbar]:hidden">
+          <Link
+            href="/"
+            className="inline-flex shrink-0 items-center truncate text-base font-semibold leading-none tracking-tight text-[var(--text)] transition hover:text-[var(--primary)] sm:text-lg md:text-xl"
+          >
             hhResearch
           </Link>
-          <nav aria-label="Primary navigation" className="flex items-center gap-2 text-base text-[var(--muted)]">
-            <Link href="/" className="rounded-lg px-3 py-2.5 transition hover:bg-[color:var(--glass-bg-strong)] hover:text-[var(--text)]">
+          <nav
+            aria-label="Primary navigation"
+            className="flex min-h-0 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap text-xs text-[var(--muted)] sm:gap-2 sm:text-sm md:text-base"
+          >
+            <Link
+              href="/"
+              className="inline-flex items-center rounded-lg px-2.5 py-2 leading-none transition hover:bg-[color:var(--glass-bg-strong)] hover:text-[var(--text)] sm:px-3 sm:py-2.5"
+            >
               {t("nav.home")}
             </Link>
             <Link
               href="/analyze"
-              className="btn-primary px-3 py-2.5 text-sm font-semibold"
+              className="btn-primary inline-flex shrink-0 items-center justify-center px-3 py-2 text-xs font-semibold leading-none sm:px-3.5 sm:py-2.5 sm:text-sm"
             >
               {t("nav.analyze")}
             </Link>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center justify-center gap-1 sm:gap-2">
             <ThemeSwitch />
             <LanguageSwitch />
           </div>

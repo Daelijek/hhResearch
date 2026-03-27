@@ -14,7 +14,7 @@ export default function Home() {
 
   return (
     <>
-      <section className="hero-glow py-16 md:py-24">
+      <section className="hero-glow py-12 sm:py-16 md:py-24">
         <div className="container-shell">
           <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="anim-fade-up">
@@ -40,7 +40,7 @@ export default function Home() {
                 </a>
               </div>
             </div>
-            <aside className="card-soft anim-fade-up p-6 md:p-8">
+            <aside className="card-soft anim-fade-up p-4 sm:p-6 md:p-8">
               <h2 className="text-lg font-semibold">{t("landing.whatYouGet")}</h2>
               <ul className="mt-4 space-y-3 text-sm text-[var(--muted)]">
                 <li>- {t("landing.out1")}</li>
@@ -86,7 +86,7 @@ export default function Home() {
       </section>
 
       <section className="container-shell py-10 md:py-16">
-        <div className="card-soft px-6 py-8 md:px-10 md:py-10">
+        <div className="card-soft px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
           <h2 className="section-title">{t("landing.faqTitle")}</h2>
           <div className="mt-6 space-y-4">
             <details className="surface-glass-sm p-4">
