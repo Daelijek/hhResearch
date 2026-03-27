@@ -1,4 +1,4 @@
-﻿export const en = {
+export const en = {
   "nav.home": "Home",
   "nav.analyze": "Analyze",
   "footer.about": "Extract market requirements from HH vacancies and work with a clean Excel report.",
@@ -49,6 +49,21 @@
   "analyze.limit2": "Manual mode expects one ID/URL per line.",
   "analyze.limit3": "In auto mode start from 1-2 pages first.",
   "analyze.exampleTitle": "Input example",
+  "analyze.historyTitle": "Recent exports",
+  "analyze.historyEmpty": "No exports yet. Run an export to see history here.",
+  "analyze.historyRepeat": "Repeat",
+  "analyze.historyDelete": "Delete",
+  "analyze.historyVacancies": "{n} vacancies",
+  "analyze.historyWarnings": "{n} warnings",
+  "analyze.dedupTitle": "Deduplication",
+  "analyze.dedupInput": "Input rows / IDs",
+  "analyze.dedupUnique": "Unique after dedup",
+  "analyze.dedupRemoved": "Duplicates removed",
+  "analyze.coverageTitle": "Coverage (successful fetches)",
+  "analyze.coverageKeySkillsPct": "With key_skills",
+  "analyze.coverageNoSkills": "Without key_skills",
+  "analyze.coverageNoDescription": "Empty description",
+  "analyze.errorsByReason": "Errors by reason",
 
   "form.noApiUrl": "NEXT_PUBLIC_API_URL is empty. Fill .env.local and restart Next.js.",
   "form.modeLegend": "Export mode",

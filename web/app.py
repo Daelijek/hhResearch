@@ -1,4 +1,6 @@
 import os
+import json
+import base64
 from datetime import datetime
 from io import BytesIO
 from typing import Annotated, Optional
@@ -41,6 +43,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "X-Export-Warnings", "X-Export-Summary"],
 )
 
 
@@ -79,25 +82,32 @@ def export_manual(
     _: Annotated[None, Depends(_require_api_key)],
 ) -> StreamingResponse:
     raw_refs = refs_from_lines(body.vacancy_ids_or_urls)
-    refs, _dupes = dedupe_vacancy_refs_preserve_order(raw_refs)
+    refs, duplicates_removed = dedupe_vacancy_refs_preserve_order(raw_refs)
     if len(refs) > MAX_VACANCIES_PER_REQUEST:
         raise HTTPException(
             status_code=422,
             detail=f"After deduplication, {len(refs)} vacancies exceed max {MAX_VACANCIES_PER_REQUEST}.",
         )
     token = _effective_token(body.token)
-    data, _processed, errors = export_refs_to_xlsx_bytes(
+    data, _processed, errors, summary = export_refs_to_xlsx_bytes(
         refs,
         token=token,
         kw_top_n=body.kw_top_n,
         kw_max_ngram=body.kw_max_ngram,
         sleep_s=body.sleep_s,
     )
+    summary["dedup"] = {
+        "input_count": len(raw_refs),
+        "unique_count": len(refs),
+        "duplicates_removed": duplicates_removed,
+    }
     bio = BytesIO(data)
     bio.seek(0)
     out_headers: dict[str, str] = {}
     if errors:
         out_headers["X-Export-Warnings"] = str(len(errors))
+    summary_bytes = json.dumps(summary, ensure_ascii=False).encode("utf-8")
+    out_headers["X-Export-Summary"] = base64.urlsafe_b64encode(summary_bytes).decode("ascii").rstrip("=")
     return StreamingResponse(
         bio,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -115,7 +125,7 @@ def export_auto(
 ) -> StreamingResponse:
     session = requests.Session()
     token = _effective_token(body.token)
-    refs = collect_refs_auto(
+    refs, raw_id_hits = collect_refs_auto(
         session=session,
         token=token,
         queries=body.queries,
@@ -132,18 +142,25 @@ def export_auto(
                 "Reduce pages, per_page, or queries."
             ),
         )
-    data, _processed, errors = export_refs_to_xlsx_bytes(
+    data, _processed, errors, summary = export_refs_to_xlsx_bytes(
         refs,
         token=token,
         kw_top_n=body.kw_top_n,
         kw_max_ngram=body.kw_max_ngram,
         sleep_s=body.sleep_s,
     )
+    summary["dedup"] = {
+        "input_count": raw_id_hits,
+        "unique_count": len(refs),
+        "duplicates_removed": max(0, raw_id_hits - len(refs)),
+    }
     bio = BytesIO(data)
     bio.seek(0)
     out_headers: dict[str, str] = {}
     if errors:
         out_headers["X-Export-Warnings"] = str(len(errors))
+    summary_bytes = json.dumps(summary, ensure_ascii=False).encode("utf-8")
+    out_headers["X-Export-Summary"] = base64.urlsafe_b64encode(summary_bytes).decode("ascii").rstrip("=")
     return StreamingResponse(
         bio,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

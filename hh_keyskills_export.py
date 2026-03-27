@@ -124,7 +124,7 @@ def main() -> None:
         else:
             vacancy_ids_to_process = raw_refs
     else:
-        vacancy_ids_to_process = collect_refs_auto(
+        vacancy_ids_to_process, _raw_hits = collect_refs_auto(
             session=session,
             token=args.token,
             queries=list(args.queries),

@@ -2,15 +2,17 @@ import io
 import os
 import time
 from datetime import datetime
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Dict, Any
 
 import requests
 from openpyxl import load_workbook
+from collections import Counter
 
 from hh_research.client import VacancyRef, fetch_vacancy, search_vacancies
 from hh_research.excel_export import (
     create_export_workbook,
     find_next_row_after_max,
+    extract_skills_and_keywords,
     write_vacancy_row_aligned,
 )
 
@@ -39,9 +41,11 @@ def collect_refs_auto(
     per_page: int,
     dedupe_vacancies: bool,
     search_sleep_s: float,
-) -> List[VacancyRef]:
+) -> Tuple[List[VacancyRef], int]:
+    """Returns (unique_refs, raw_id_hits) where raw_id_hits counts every search item with a valid id (incl. duplicates)."""
     seen_ids: set[str] = set()
     vacancy_ids_to_process: List[VacancyRef] = []
+    raw_id_hits = 0
     for q in queries:
         for page in range(pages):
             items = search_vacancies(session, token, q, page=page, per_page=per_page)
@@ -49,6 +53,7 @@ def collect_refs_auto(
                 vid = str(it.get("id") or "").strip()
                 if not vid:
                     continue
+                raw_id_hits += 1
                 if dedupe_vacancies:
                     if vid in seen_ids:
                         continue
@@ -56,7 +61,7 @@ def collect_refs_auto(
                 vacancy_ids_to_process.append(VacancyRef(vacancy_id=vid))
             if search_sleep_s > 0:
                 time.sleep(search_sleep_s)
-    return vacancy_ids_to_process
+    return vacancy_ids_to_process, raw_id_hits
 
 
 def run_export_on_worksheet(
@@ -74,7 +79,7 @@ def run_export_on_worksheet(
     kw_max_ngram: int,
     sleep_s: float,
     on_progress: Optional[Callable[[int, int], None]] = None,
-) -> Tuple[int, int, List[str]]:
+) -> Tuple[int, int, List[str], Dict[str, Any]]:
     """
     Fetches each vacancy and appends blocks to ws starting at next_row.
     Returns (processed_count, next_row_after_last_block, list of error messages per failed id).
@@ -83,6 +88,11 @@ def run_export_on_worksheet(
     processed = 0
     errors: List[str] = []
     row = next_row
+    skill_freq: Counter[str] = Counter()
+    keyword_freq: Counter[str] = Counter()
+    with_key_skills = 0
+    without_key_skills = 0
+    without_description = 0
 
     for ref in refs:
         vid = ref.vacancy_id
@@ -91,6 +101,24 @@ def run_export_on_worksheet(
         except Exception as e:
             errors.append(f"{vid}: {e}")
             continue
+        _title, _vid, _link, keywords, skill_names = extract_skills_and_keywords(
+            vac,
+            kw_top_n=kw_top_n,
+            kw_max_ngram=kw_max_ngram,
+        )
+        for s in skill_names:
+            if s:
+                skill_freq[s] += 1
+        for k in keywords:
+            if k:
+                keyword_freq[k] += 1
+
+        if skill_names:
+            with_key_skills += 1
+        else:
+            without_key_skills += 1
+        if not (vac.get("description") or "").strip():
+            without_description += 1
 
         row = write_vacancy_row_aligned(
             ws=ws,
@@ -103,6 +131,8 @@ def run_export_on_worksheet(
             col_link=col_link,
             kw_top_n=kw_top_n,
             kw_max_ngram=kw_max_ngram,
+            keywords=keywords,
+            skill_names=skill_names,
         )
         processed += 1
         if sleep_s > 0:
@@ -110,7 +140,33 @@ def run_export_on_worksheet(
         if on_progress and processed % 10 == 0:
             on_progress(processed, total)
 
-    return processed, row, errors
+    reason_counter: Counter[str] = Counter()
+    for msg in errors:
+        reason = msg.split(": ", 1)[1].strip() if ": " in msg else msg.strip()
+        if len(reason) > 220:
+            reason = reason[:217] + "..."
+        reason_counter[reason] += 1
+
+    successful = processed
+    summary: Dict[str, Any] = {
+        "requested": total,
+        "processed": processed,
+        "errors": len(errors),
+        "top_skills": [{"name": k, "count": v} for k, v in skill_freq.most_common(20)],
+        "top_keywords": [{"name": k, "count": v} for k, v in keyword_freq.most_common(20)],
+        "coverage": {
+            "successful": successful,
+            "with_key_skills": with_key_skills,
+            "without_key_skills": without_key_skills,
+            "without_description": without_description,
+            "key_skills_rate": round(with_key_skills / successful, 4) if successful else 0.0,
+        },
+        "error_breakdown": [
+            {"reason": r, "count": c} for r, c in reason_counter.most_common(10)
+        ],
+    }
+
+    return processed, row, errors, summary
 
 
 def export_refs_to_xlsx_bytes(
@@ -126,10 +182,10 @@ def export_refs_to_xlsx_bytes(
     col_link: int = 5,
     start_row: int = 2,
     sheet_name: str = "Sheet1",
-) -> Tuple[bytes, int, List[str]]:
+) -> Tuple[bytes, int, List[str], Dict[str, Any]]:
     session = requests.Session()
     wb, ws = create_export_workbook(sheet_name=sheet_name)
-    processed, _, errors = run_export_on_worksheet(
+    processed, _, errors, summary = run_export_on_worksheet(
         ws=ws,
         refs=refs,
         session=session,
@@ -146,7 +202,7 @@ def export_refs_to_xlsx_bytes(
     )
     buf = io.BytesIO()
     wb.save(buf)
-    return buf.getvalue(), processed, errors
+    return buf.getvalue(), processed, errors, summary
 
 
 def append_refs_to_template_file(
@@ -176,7 +232,7 @@ def append_refs_to_template_file(
         find_next_row_after_max(ws, col_id, start_row),
     )
     session = requests.Session()
-    processed, next_row_after, errors = run_export_on_worksheet(
+    processed, next_row_after, errors, _summary = run_export_on_worksheet(
         ws=ws,
         refs=refs,
         session=session,

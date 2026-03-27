@@ -1,6 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
+import {
+  mergeExportPreset,
+  pushExportHistory,
+  type ExportFormPreset,
+  type ExportSummary,
+} from "./export-history";
 import { useI18n } from "./i18n";
 
 function filenameFromContentDisposition(header: string | null): string {
@@ -19,30 +25,48 @@ function linesFromTextarea(value: string): string[] {
     .filter(Boolean);
 }
 
-export function ExportForm() {
+function decodeBase64UrlUtf8(input: string): string {
+  const padded = input.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(input.length / 4) * 4, "=");
+  const bin = atob(padded);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+export function ExportForm({
+  onSummary,
+  onHistoryChange,
+  initialPreset,
+}: {
+  onSummary?: (summary: ExportSummary | null) => void;
+  onHistoryChange?: () => void;
+  initialPreset?: ExportFormPreset | null;
+}) {
   const { t } = useI18n();
   const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "", []);
+  const seed = mergeExportPreset(initialPreset ?? undefined);
 
-  const [mode, setMode] = useState<"manual" | "auto">("manual");
-  const [manualLines, setManualLines] = useState("");
-  const [queriesText, setQueriesText] = useState("frontend developer\nfullstack developer");
-  const [pages, setPages] = useState(2);
-  const [perPage, setPerPage] = useState(100);
-  const [kwTopN, setKwTopN] = useState(30);
-  const [kwMaxNgram, setKwMaxNgram] = useState(3);
-  const [sleepS, setSleepS] = useState(0.2);
-  const [searchSleepS, setSearchSleepS] = useState(0.2);
+  const [mode, setMode] = useState<"manual" | "auto">(seed.mode);
+  const [manualLines, setManualLines] = useState(seed.manualLines);
+  const [queriesText, setQueriesText] = useState(seed.queriesText);
+  const [pages, setPages] = useState(seed.pages);
+  const [perPage, setPerPage] = useState(seed.perPage);
+  const [kwTopN, setKwTopN] = useState(seed.kwTopN);
+  const [kwMaxNgram, setKwMaxNgram] = useState(seed.kwMaxNgram);
+  const [sleepS, setSleepS] = useState(seed.sleepS);
+  const [searchSleepS, setSearchSleepS] = useState(seed.searchSleepS);
   const [hhToken, setHhToken] = useState("");
   const [apiKey, setApiKey] = useState(() => process.env.NEXT_PUBLIC_API_KEY ?? "");
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statsStatus, setStatsStatus] = useState<"idle" | "ok" | "missing" | "bad">("idle");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setStatsStatus("idle");
 
     if (!baseUrl) {
       setError(t("form.errNoUrl"));
@@ -96,9 +120,28 @@ export function ExportForm() {
       });
 
       const warnings = response.headers.get("X-Export-Warnings");
+      const summaryHeader = response.headers.get("X-Export-Summary");
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || response.statusText);
+      }
+
+      let parsedSummary: ExportSummary | null = null;
+      if (onSummary) {
+        try {
+          if (summaryHeader) {
+            const jsonText = decodeBase64UrlUtf8(summaryHeader);
+            parsedSummary = JSON.parse(jsonText) as ExportSummary;
+            onSummary(parsedSummary);
+            setStatsStatus("ok");
+          } else {
+            onSummary(null);
+            setStatsStatus("missing");
+          }
+        } catch {
+          onSummary(null);
+          setStatsStatus(summaryHeader ? "bad" : "missing");
+        }
       }
 
       const blob = await response.blob();
@@ -109,6 +152,31 @@ export function ExportForm() {
       anchor.download = fileName;
       anchor.click();
       URL.revokeObjectURL(href);
+
+      if (parsedSummary) {
+        pushExportHistory({
+          mode,
+          warnings: warnings ? Number(warnings) : null,
+          fileName,
+          summary: {
+            requested: parsedSummary.requested,
+            processed: parsedSummary.processed,
+            errors: parsedSummary.errors,
+          },
+          preset: mergeExportPreset({
+            mode,
+            manualLines,
+            queriesText,
+            pages,
+            perPage,
+            kwTopN,
+            kwMaxNgram,
+            sleepS,
+            searchSleepS,
+          }),
+        });
+        onHistoryChange?.();
+      }
 
       setMessage(
         warnings
@@ -130,7 +198,7 @@ export function ExportForm() {
           style={{
             background: "var(--warning-bg)",
             color: "var(--warning-text)",
-            borderColor: "#ffd8a3",
+            borderColor: "color-mix(in srgb, var(--warning-text), transparent 55%)",
           }}
         >
           {t("form.noApiUrl")}
@@ -139,7 +207,7 @@ export function ExportForm() {
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <legend className="mb-2 text-sm font-medium text-[var(--muted)]">{t("form.modeLegend")}</legend>
-        <label className="card-soft flex cursor-pointer items-center gap-2 p-3 text-sm">
+        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
           <input
             type="radio"
             checked={mode === "manual"}
@@ -148,7 +216,7 @@ export function ExportForm() {
           />
           {t("form.modeManual")}
         </label>
-        <label className="card-soft flex cursor-pointer items-center gap-2 p-3 text-sm">
+        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
           <input
             type="radio"
             checked={mode === "auto"}
@@ -288,7 +356,7 @@ export function ExportForm() {
           style={{
             background: "var(--error-bg)",
             color: "var(--error-text)",
-            borderColor: "#ffd0d4",
+            borderColor: "color-mix(in srgb, var(--error-text), transparent 60%)",
           }}
         >
           {error}
@@ -301,7 +369,7 @@ export function ExportForm() {
           style={{
             background: "var(--success-bg)",
             color: "var(--success-text)",
-            borderColor: "#bdeacb",
+            borderColor: "color-mix(in srgb, var(--success-text), transparent 65%)",
           }}
         >
           {message}
@@ -311,10 +379,16 @@ export function ExportForm() {
       <button
         type="submit"
         disabled={busy}
-        className="rounded-xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-700)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? t("form.btnBusy") : t("form.btnReady")}
       </button>
+
+      {statsStatus !== "idle" && (
+        <p className="text-xs text-[var(--muted)]">
+          Stats: {statsStatus === "ok" ? "received" : statsStatus === "missing" ? "missing from API response" : "failed to parse"}
+        </p>
+      )}
     </form>
   );
 }

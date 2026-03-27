@@ -1,4 +1,4 @@
-﻿export const ru = {
+export const ru = {
   "nav.home": "Главная",
   "nav.analyze": "Анализ",
   "footer.about": "Извлекайте требования рынка из вакансий HH и работайте с чистым Excel-отчетом.",
@@ -49,6 +49,21 @@
   "analyze.limit2": "В manual режиме — один ID/URL в строке.",
   "analyze.limit3": "В auto режиме начните с 1-2 страниц.",
   "analyze.exampleTitle": "Пример ввода",
+  "analyze.historyTitle": "История экспортов",
+  "analyze.historyEmpty": "Пока нет экспортов. Запустите выгрузку, чтобы увидеть историю.",
+  "analyze.historyRepeat": "Повторить",
+  "analyze.historyDelete": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+  "analyze.historyVacancies": "{n} вакансий",
+  "analyze.historyWarnings": "{n} предупреждений",
+  "analyze.dedupTitle": "Дедупликация",
+  "analyze.dedupInput": "Строк ввода / ID",
+  "analyze.dedupUnique": "Уникальных после дедупа",
+  "analyze.dedupRemoved": "Дубликатов удалено",
+  "analyze.coverageTitle": "Покрытие (успешные загрузки)",
+  "analyze.coverageKeySkillsPct": "С key_skills",
+  "analyze.coverageNoSkills": "Без key_skills",
+  "analyze.coverageNoDescription": "Пустое описание",
+  "analyze.errorsByReason": "Ошибки по причинам",
 
   "form.noApiUrl": "NEXT_PUBLIC_API_URL пуст. Заполните .env.local и перезапустите Next.js.",
   "form.modeLegend": "Режим выгрузки",

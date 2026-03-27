@@ -1,9 +1,44 @@
-from typing import Tuple
+from typing import Tuple, List
 
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from hh_research.keywords import extract_keywords_simple, extract_text_from_html
+
+
+def extract_skills_and_keywords(
+    vac: dict,
+    kw_top_n: int,
+    kw_max_ngram: int,
+) -> Tuple[str, str, str, List[str], List[str]]:
+    vid = str(vac.get("id") or "").strip()
+    title = str(vac.get("name") or "").strip()
+    link = vac.get("alternate_url") or vac.get("url") or ""
+    link = str(link).strip()
+    if not link and vid:
+        link = f"https://hh.ru/vacancy/{vid}"
+
+    key_skills = vac.get("key_skills") or []
+    skill_names: list[str] = []
+    for s in key_skills:
+        name = None
+        if isinstance(s, dict):
+            name = s.get("name")
+        elif isinstance(s, str):
+            name = s
+        if name and str(name).strip():
+            skill_names.append(str(name).strip())
+
+    description_html = vac.get("description") or ""
+    description_text = extract_text_from_html(description_html)
+    keywords = extract_keywords_simple(
+        description_text,
+        top_n=kw_top_n,
+        max_ngram=kw_max_ngram,
+    )
+    keywords = [str(k).strip() for k in keywords if k and str(k).strip()]
+
+    return title, vid, link, keywords, skill_names
 
 
 def create_export_workbook(sheet_name: str = "Sheet1") -> Tuple[Workbook, Worksheet]:
@@ -38,33 +73,19 @@ def write_vacancy_row_aligned(
     col_link: int,
     kw_top_n: int,
     kw_max_ngram: int,
+    *,
+    keywords: List[str] | None = None,
+    skill_names: List[str] | None = None,
 ) -> int:
-    vid = str(vac.get("id") or "").strip()
-    title = str(vac.get("name") or "").strip()
-    link = vac.get("alternate_url") or vac.get("url") or ""
-    link = str(link).strip()
-    if not link and vid:
-        link = f"https://hh.ru/vacancy/{vid}"
-
-    key_skills = vac.get("key_skills") or []
-    skill_names: list[str] = []
-    for s in key_skills:
-        name = None
-        if isinstance(s, dict):
-            name = s.get("name")
-        elif isinstance(s, str):
-            name = s
-        if name and str(name).strip():
-            skill_names.append(str(name).strip())
-
-    description_html = vac.get("description") or ""
-    description_text = extract_text_from_html(description_html)
-    keywords = extract_keywords_simple(
-        description_text,
-        top_n=kw_top_n,
-        max_ngram=kw_max_ngram,
+    title, vid, link, computed_keywords, computed_skills = extract_skills_and_keywords(
+        vac,
+        kw_top_n=kw_top_n,
+        kw_max_ngram=kw_max_ngram,
     )
-    keywords = [str(k).strip() for k in keywords if k and str(k).strip()]
+    if keywords is None:
+        keywords = computed_keywords
+    if skill_names is None:
+        skill_names = computed_skills
 
     max_len = max(len(keywords), len(skill_names), 1)
 

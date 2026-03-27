@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { I18nProvider, useI18n, type Lang } from "./i18n";
+import { ThemeProvider, useTheme } from "./theme";
 
 function LanguageSwitch() {
   const { lang, setLang, t } = useI18n();
 
   const options: Lang[] = ["en", "ru", "kk"];
   return (
-    <div className="flex items-center gap-1 rounded-md border border-[var(--border)] bg-white p-1 text-xs">
+    <div className="surface-glass-sm flex items-center gap-1 p-1 text-xs shadow-glassSoft">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => setLang(opt)}
-          className={`rounded px-2 py-1 transition ${lang === opt ? "bg-[var(--primary)] text-white" : "text-[var(--muted)] hover:bg-[var(--surface-soft)]"
+          className={`rounded-md px-2 py-1 transition ${lang === opt ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
             }`}
           aria-label={`Switch to ${opt}`}
         >
@@ -25,34 +26,53 @@ function LanguageSwitch() {
   );
 }
 
+function ThemeSwitch() {
+  const { theme, toggle } = useTheme();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="btn-soft inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-[var(--text)]"
+      aria-label="Toggle theme"
+      title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+    >
+      <span aria-hidden>{theme === "dark" ? "🌙" : "☀️"}</span>
+      <span className="hidden sm:inline">{theme === "dark" ? "Dark" : "Light"}</span>
+    </button>
+  );
+}
+
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/85 backdrop-blur">
+      <header className="bar-glass sticky top-0 z-40 border-b">
         <div className="container-shell flex h-20 items-center justify-between gap-3">
-          <Link href="/" className="text-xl font-semibold tracking-tight text-[var(--text)]">
+          <Link href="/" className="text-xl font-semibold tracking-tight text-[var(--text)] transition hover:text-[var(--primary)]">
             hhResearch
           </Link>
           <nav aria-label="Primary navigation" className="flex items-center gap-2 text-base text-[var(--muted)]">
-            <Link href="/" className="rounded-md px-3 py-2.5 transition hover:bg-[var(--surface-soft)] hover:text-[var(--text)]">
+            <Link href="/" className="rounded-lg px-3 py-2.5 transition hover:bg-[color:var(--glass-bg-strong)] hover:text-[var(--text)]">
               {t("nav.home")}
             </Link>
             <Link
               href="/analyze"
-              className="rounded-md bg-[var(--primary)] px-3 py-2.5 font-medium text-white transition hover:bg-[var(--primary-700)]"
+              className="btn-primary px-3 py-2.5 text-sm font-semibold"
             >
               {t("nav.analyze")}
             </Link>
           </nav>
-          <LanguageSwitch />
+          <div className="flex items-center gap-2">
+            <ThemeSwitch />
+            <LanguageSwitch />
+          </div>
         </div>
       </header>
 
       <main>{children}</main>
 
-      <footer className="mt-20 border-t border-[var(--border)] bg-white/80 py-10">
+      <footer className="bar-glass relative mt-20 border-t py-10">
         <div className="container-shell grid gap-8 md:grid-cols-3">
           <section>
             <h2 className="text-base font-semibold">hhResearch</h2>
@@ -78,14 +98,20 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <ul className="mt-2 space-y-2 text-sm text-[var(--muted)]">
               <li>
                 Email:{" "}
-                <a href="mailto:you@example.com" className="hover:text-[var(--text)]">
-                  you@example.com
+                <a href="mailto:dias1605ermek@gmail.com" className="hover:text-[var(--text)]">
+                  dias1605ermek@gmail.com
                 </a>
               </li>
               <li>
                 Telegram:{" "}
-                <a href="https://t.me/your_username" className="hover:text-[var(--text)]">
-                  @your_username
+                <a href="https://t.me/daelijek_og" className="hover:text-[var(--text)]">
+                  @daelijek_og
+                </a>
+              </li>
+              <li>
+                GitHub:{" "}
+                <a href="https://github.com/Daelijek" className="hover:text-[var(--text)]">
+                  Daelijek
                 </a>
               </li>
             </ul>
@@ -98,9 +124,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <I18nProvider>
-      <ShellContent>{children}</ShellContent>
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <ShellContent>{children}</ShellContent>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }
 
