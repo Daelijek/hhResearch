@@ -22,6 +22,12 @@ def _parse_cors_origins() -> list[str]:
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
+def _cors_origin_regex() -> Optional[str]:
+    """Optional regex for origins not listed in CORS_ORIGINS (e.g. all *.vercel.app previews)."""
+    raw = os.environ.get("CORS_ORIGIN_REGEX", "").strip()
+    return raw or None
+
+
 def _effective_token(body_token: Optional[str]) -> Optional[str]:
     return body_token or os.environ.get("HH_TOKEN") or None
 
@@ -40,6 +46,7 @@ app = FastAPI(title="hhResearch API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_parse_cors_origins(),
+    allow_origin_regex=_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
