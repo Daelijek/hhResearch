@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument("--start-row", type=int, default=2, help="Excel start row (after headers)")
 
     parser.add_argument("--kw-top-n", type=int, default=30, help="How many keywords per vacancy (description)")
-    parser.add_argument("--kw-max-ngram", type=int, default=3, help="Max ngram size for keywords (1..3)")
+    parser.add_argument("--kw-max-ngram", type=int, default=3, help="Max ngram size for keywords (1..5)")
 
     parser.add_argument("--token", default=None, help="HH API access token (optional)")
     parser.add_argument("--sleep-s", type=float, default=0.2, help="Sleep between vacancy requests")
@@ -98,6 +98,35 @@ def main() -> None:
     args = parser.parse_args()
 
     excel_path = args.excel
+
+    def _require_range(name: str, value: float, min_v: float, max_v: float) -> None:
+        if value < min_v or value > max_v:
+            raise SystemExit(f"Invalid {name}={value}; expected range [{min_v}..{max_v}]")
+
+    # Basic validations aligned with API constraints (to fail fast and with a readable message)
+    _require_range("kw_top_n", args.kw_top_n, 1, 200)
+    _require_range("kw_max_ngram", args.kw_max_ngram, 1, 5)
+    _require_range("sleep_s", args.sleep_s, 0, 5)
+    _require_range("search_sleep_s", args.search_sleep_s, 0, 5)
+    _require_range("pages", args.pages, 1, 20)
+    _require_range("per_page", args.per_page, 1, 100)
+    _require_range("start_row", args.start_row, 2, 1_000_000)
+    for col_name, v in [
+        ("col_title", args.col_title),
+        ("col_keywords", args.col_keywords),
+        ("col_skills", args.col_skills),
+        ("col_id", args.col_id),
+        ("col_link", args.col_link),
+    ]:
+        if v < 1:
+            raise SystemExit(f"Invalid {col_name}={v}; expected >= 1")
+
+    if not os.path.isfile(excel_path):
+        raise SystemExit(f"Template excel not found: {excel_path}")
+    if args.mode == "manual":
+        if not args.manual_input or not os.path.isfile(args.manual_input):
+            raise SystemExit(f"manual-input file not found: {args.manual_input}")
+
     sheet_name = args.sheet
     out_path = args.out
     project_dir = _SCRIPT_DIR
@@ -141,7 +170,7 @@ def main() -> None:
     def on_progress(done: int, tot: int) -> None:
         print(f"Processed {done}/{tot} vacancies...")
 
-    processed, next_row, errors = append_refs_to_template_file(
+    processed, next_row, errors, summary = append_refs_to_template_file(
         excel_path=excel_path,
         sheet_name=sheet_name,
         refs=vacancy_ids_to_process,
@@ -166,6 +195,35 @@ def main() -> None:
     print("Output:", out_path)
     print("Vacancies processed:", processed)
     print("Next row:", next_row)
+
+    if summary:
+        coverage = summary.get("coverage") or {}
+        req = summary.get("requested", 0)
+        successful = coverage.get("successful", 0)
+        key_rate = coverage.get("key_skills_rate", 0.0)
+        print(
+            f"Coverage: successful={successful}/{req}, "
+            f"with_key_skills={coverage.get('with_key_skills', 0)}, "
+            f"key_skills_rate={key_rate}"
+        )
+        top_skills = summary.get("top_skills") or []
+        top_keywords = summary.get("top_keywords") or []
+        if top_skills:
+            print(
+                "Top skills:",
+                ", ".join([f"{x['name']}({x['count']})" for x in top_skills[:10]]),
+            )
+        if top_keywords:
+            print(
+                "Top keywords:",
+                ", ".join([f"{x['name']}({x['count']})" for x in top_keywords[:10]]),
+            )
+        err_breakdown = summary.get("error_breakdown") or []
+        if err_breakdown:
+            print(
+                "Top errors:",
+                ", ".join([f"{x['reason']}({x['count']})" for x in err_breakdown[:5]]),
+            )
 
 
 if __name__ == "__main__":

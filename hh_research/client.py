@@ -1,7 +1,7 @@
 import re
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -86,17 +86,34 @@ def hh_get_json(
     url: str,
     session: requests.Session,
     token: Optional[str],
-    timeout_s: int = 30,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+    timeout_s: float = 30.0,
+    retries: int = 3,
 ) -> dict:
-    headers = {
+    headers: Dict[str, str] = {
         "User-Agent": "hh-research-script",
         "Accept": "application/json",
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    resp = session.get(url, headers=headers, timeout=timeout_s)
-    resp.raise_for_status()
-    return resp.json()
+
+    last_err: Optional[Exception] = None
+    for attempt in range(retries):
+        try:
+            resp = session.get(url, params=params, headers=headers, timeout=timeout_s)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            last_err = e
+            if attempt >= retries - 1 or not _is_retryable_requests_error(e):
+                raise
+            wait = _retry_after_seconds(getattr(e, "response", None), attempt)
+            time.sleep(wait)
+
+    # retries=0 не ожидаем, но если передадут — пусть упадет с понятной ошибкой
+    assert last_err is not None
+    raise last_err
 
 
 def search_vacancies(
@@ -105,18 +122,24 @@ def search_vacancies(
     query: str,
     page: int,
     per_page: int,
+    *,
+    timeout_s: float = 30.0,
+    retries: int = 3,
 ) -> List[dict]:
     params = {
         "text": query,
         "page": page,
         "per_page": per_page,
     }
-    headers = {"User-Agent": "hh-research-script", "Accept": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    resp = session.get(f"{HH_API_BASE}/vacancies", params=params, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json().get("items", []) or []
+    data = hh_get_json(
+        f"{HH_API_BASE}/vacancies",
+        session=session,
+        token=token,
+        params=params,
+        timeout_s=timeout_s,
+        retries=retries,
+    )
+    return data.get("items", []) or []
 
 
 def fetch_vacancy(
@@ -126,15 +149,4 @@ def fetch_vacancy(
     retries: int = 3,
 ) -> dict:
     url = f"{HH_API_BASE}/vacancies/{vacancy_id}"
-    last_err: Optional[Exception] = None
-    for attempt in range(retries):
-        try:
-            return hh_get_json(url, session, token)
-        except requests.RequestException as e:
-            last_err = e
-            if not _is_retryable_requests_error(e):
-                raise
-            wait = _retry_after_seconds(getattr(e, "response", None), attempt)
-            time.sleep(wait)
-    assert last_err is not None
-    raise last_err
+    return hh_get_json(url, session=session, token=token, timeout_s=30.0, retries=retries)

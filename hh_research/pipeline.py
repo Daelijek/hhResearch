@@ -197,6 +197,7 @@ def export_refs_to_xlsx_bytes(
     col_link: int = 5,
     start_row: int = 2,
     sheet_name: str = "Sheet1",
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> Tuple[bytes, int, List[str], Dict[str, Any]]:
     session = requests.Session()
     wb, ws = create_export_workbook(sheet_name=sheet_name)
@@ -214,6 +215,7 @@ def export_refs_to_xlsx_bytes(
         kw_top_n=kw_top_n,
         kw_max_ngram=kw_max_ngram,
         sleep_s=sleep_s,
+        on_progress=on_progress,
     )
     buf = io.BytesIO()
     wb.save(buf)
@@ -236,18 +238,20 @@ def append_refs_to_template_file(
     sleep_s: float,
     out_path: str,
     on_progress: Optional[Callable[[int, int], None]] = None,
-) -> Tuple[int, int, List[str]]:
+) -> Tuple[int, int, List[str], Dict[str, Any]]:
     wb = load_workbook(excel_path)
     if sheet_name not in wb.sheetnames:
         raise ValueError(f"Sheet '{sheet_name}' not found. Available: {wb.sheetnames}")
     ws = wb[sheet_name]
     next_row = max(
+        find_next_row_after_max(ws, col_title, start_row),
         find_next_row_after_max(ws, col_keywords, start_row),
         find_next_row_after_max(ws, col_skills, start_row),
         find_next_row_after_max(ws, col_id, start_row),
+        find_next_row_after_max(ws, col_link, start_row),
     )
     session = requests.Session()
-    processed, next_row_after, errors, _summary = run_export_on_worksheet(
+    processed, next_row_after, errors, summary = run_export_on_worksheet(
         ws=ws,
         refs=refs,
         session=session,
@@ -265,4 +269,4 @@ def append_refs_to_template_file(
         format_headers=False,
     )
     wb.save(out_path)
-    return processed, next_row_after, errors
+    return processed, next_row_after, errors, summary

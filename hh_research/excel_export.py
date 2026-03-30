@@ -64,6 +64,17 @@ def extract_skills_and_keywords(
     return title, vid, link, keywords, skill_names
 
 
+def extract_vacancy_identity(vac: dict) -> Tuple[str, str, str]:
+    """Fast extraction of fields used for Excel writing (no HTML parsing)."""
+    vid = str(vac.get("id") or "").strip()
+    title = str(vac.get("name") or "").strip()
+    link = vac.get("alternate_url") or vac.get("url") or ""
+    link = str(link).strip()
+    if not link and vid:
+        link = f"https://hh.ru/vacancy/{vid}"
+    return title, vid, link
+
+
 def create_export_workbook(sheet_name: str = "Sheet1") -> Tuple[Workbook, Worksheet]:
     wb = Workbook()
     ws = wb.active
@@ -175,9 +186,9 @@ def finalize_export_sheet(
     if max_r >= data_row:
         apply_duplicate_cell_highlight(ws, col_keywords, data_row, max_r)
         apply_duplicate_cell_highlight(ws, col_skills, data_row, max_r)
-    ws.freeze_panes = ws.cell(data_row, 1).coordinate
     lo = min(cols_scan)
     hi = max(cols_scan)
+    ws.freeze_panes = ws.cell(data_row, lo).coordinate
     for row in ws.iter_rows(min_row=data_row, max_row=max_r, min_col=lo, max_col=hi):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -207,15 +218,23 @@ def write_vacancy_row_aligned(
     keywords: List[str] | None = None,
     skill_names: List[str] | None = None,
 ) -> int:
-    title, vid, link, computed_keywords, computed_skills = extract_skills_and_keywords(
-        vac,
-        kw_top_n=kw_top_n,
-        kw_max_ngram=kw_max_ngram,
-    )
-    if keywords is None:
-        keywords = computed_keywords
-    if skill_names is None:
-        skill_names = computed_skills
+    title, vid, link = extract_vacancy_identity(vac)
+
+    # Pipeline передает keywords/skills уже вычисленными; это важно для скорости
+    # и для того, чтобы эвристика извлечения выполнялась один раз на вакансию.
+    if keywords is None or skill_names is None:
+        _, _, _, computed_keywords, computed_skills = extract_skills_and_keywords(
+            vac,
+            kw_top_n=kw_top_n,
+            kw_max_ngram=kw_max_ngram,
+        )
+        if keywords is None:
+            keywords = computed_keywords
+        if skill_names is None:
+            skill_names = computed_skills
+
+    keywords = keywords or []
+    skill_names = skill_names or []
 
     max_len = max(len(keywords), len(skill_names), 1)
 

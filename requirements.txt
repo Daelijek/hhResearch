@@ -3,3 +3,7 @@ openpyxl
 beautifulsoup4
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
+redis
+rq
+pymorphy2
+pymorphy2-dicts-ru

@@ -32,6 +32,28 @@ function decodeBase64UrlUtf8(input: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+function parseApiErrorText(text: string): { code?: string; message?: string; vars?: Record<string, unknown> } {
+  try {
+    const json = JSON.parse(text);
+    // FastAPI usually wraps our body as { detail: ... }
+    const detail = json?.detail;
+    if (detail && typeof detail === "object") {
+      const code = typeof detail.error === "string" ? detail.error : undefined;
+      const message = typeof detail.message === "string" ? detail.message : undefined;
+      return { code, message, vars: detail };
+    }
+    if (typeof detail === "string") {
+      return { message: detail };
+    }
+    if (typeof json?.detail?.message === "string") {
+      return { message: json.detail.message };
+    }
+    return { message: text };
+  } catch {
+    return { message: text };
+  }
+}
+
 export function ExportForm({
   onSummary,
   onHistoryChange,
@@ -122,7 +144,43 @@ export function ExportForm({
       const summaryHeader = response.headers.get("X-Export-Summary");
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || response.statusText);
+        const apiErr = parseApiErrorText(text);
+
+        const code = apiErr.code;
+        const vars = apiErr.vars ?? {};
+        const messageFallback = apiErr.message || response.statusText || "Unknown error";
+
+        if (code === "too_many_vacancies") {
+          const search_countVal = vars["search_count"];
+          const maxVal = vars["max"];
+          const search_count = typeof search_countVal === "number" ? String(search_countVal) : undefined;
+          const max = typeof maxVal === "number" ? String(maxVal) : undefined;
+          setError(
+            t("form.errTooManyVacancies", {
+              search_count: search_count ?? "0",
+              max: max ?? "0",
+            })
+          );
+          return;
+        }
+
+        if (code === "invalid_vacancy_ref") {
+          setError(t("form.errInvalidVacancyRef"));
+          return;
+        }
+
+        if (code === "search_failed") {
+          setError(t("form.errSearchFailed"));
+          return;
+        }
+
+        if (code === "export_failed") {
+          setError(t("form.errExportFailed"));
+          return;
+        }
+
+        setError(messageFallback);
+        return;
       }
 
       let parsedSummary: ExportSummary | null = null;
