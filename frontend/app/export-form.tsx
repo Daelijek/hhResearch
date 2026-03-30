@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { createPortal } from "react-dom";
 import {
   mergeExportPreset,
   pushExportHistory,
@@ -8,6 +10,83 @@ import {
   type ExportSummary,
 } from "./export-history";
 import { useI18n } from "./i18n";
+
+function TooltipIcon({ text, alt }: { text: string; alt: string }) {
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number; maxWidth: number } | null>(null);
+
+  function updatePosition() {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 12;
+    const maxWidth = Math.min(360, Math.max(220, window.innerWidth - margin * 2));
+    const desiredLeft = r.left + r.width / 2;
+    const clampedLeft = Math.max(margin, Math.min(window.innerWidth - margin, desiredLeft));
+    setPos({ left: clampedLeft, top: r.bottom + 10, maxWidth });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const onScroll = () => updatePosition();
+    const onResize = () => updatePosition();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
+  return (
+    <span className="relative inline-flex items-center align-middle">
+      <button
+        type="button"
+        className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md border border-[var(--glass-border)] bg-[color:var(--glass-bg-strong)] hover:bg-[color:var(--glass-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        aria-label={alt}
+        ref={btnRef}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        <Image src="/tooltip.png" alt="" width={14} height={14} className="hh-tooltip-icon" />
+      </button>
+      {open &&
+        typeof document !== "undefined" &&
+        pos &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top,
+              transform: "translateX(-50%)",
+              width: `min(${pos.maxWidth}px, 80vw)`,
+              zIndex: 1000,
+              pointerEvents: "none",
+              border: "1px solid var(--glass-border)",
+              background: "var(--glass-bg-strong)",
+              color: "var(--text)",
+              borderRadius: "0.75rem",
+              padding: "0.75rem",
+              fontSize: "0.75rem",
+              lineHeight: "1.25rem",
+              boxShadow: "0 14px 40px rgba(0,0,0,0.18)",
+              backdropFilter: "blur(var(--glass-blur-sm)) saturate(var(--glass-sat))",
+              WebkitBackdropFilter: "blur(var(--glass-blur-sm)) saturate(var(--glass-sat))",
+            }}
+          >
+            {text}
+          </div>,
+          document.body
+        )}
+    </span>
+  );
+}
 
 function filenameFromContentDisposition(header: string | null): string {
   if (!header) return "hh_export.xlsx";
@@ -268,7 +347,10 @@ export function ExportForm({
       )}
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
-        <legend className="mb-2 text-sm font-medium text-[var(--muted)]">{t("form.modeLegend")}</legend>
+        <legend className="mb-2 inline-flex items-center text-sm font-medium text-[var(--muted)]">
+          {t("form.modeLegend")}
+          <TooltipIcon text={t("form.modeHelp")} alt={t("form.tooltipAlt")} />
+        </legend>
         <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
           <input
             type="radio"
@@ -291,7 +373,10 @@ export function ExportForm({
 
       {mode === "manual" ? (
         <label className="form-field">
-          <span className="form-label">{t("form.manualLabel")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.manualLabel")}
+            <TooltipIcon text={t("form.manualLabelHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <textarea
             value={manualLines}
             onChange={(e) => setManualLines(e.target.value)}
@@ -303,7 +388,10 @@ export function ExportForm({
       ) : (
         <section className="grid gap-4">
           <label className="form-field">
-            <span className="form-label">{t("form.autoLabel")}</span>
+            <span className="form-label inline-flex items-center">
+              {t("form.autoLabel")}
+              <TooltipIcon text={t("form.autoLabelHelp")} alt={t("form.tooltipAlt")} />
+            </span>
             <textarea
               value={queriesText}
               onChange={(e) => setQueriesText(e.target.value)}
@@ -313,7 +401,10 @@ export function ExportForm({
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="form-field">
-              <span className="form-label">{t("form.pages")}</span>
+              <span className="form-label inline-flex items-center">
+                {t("form.pages")}
+                <TooltipIcon text={t("form.pagesHelp")} alt={t("form.tooltipAlt")} />
+              </span>
               <input
                 type="number"
                 min={1}
@@ -324,7 +415,10 @@ export function ExportForm({
               />
             </label>
             <label className="form-field">
-              <span className="form-label">{t("form.perPage")}</span>
+              <span className="form-label inline-flex items-center">
+                {t("form.perPage")}
+                <TooltipIcon text={t("form.perPageHelp")} alt={t("form.tooltipAlt")} />
+              </span>
               <input
                 type="number"
                 min={1}
@@ -340,7 +434,10 @@ export function ExportForm({
 
       <section className="grid gap-4 md:grid-cols-2">
         <label className="form-field">
-          <span className="form-label">{t("form.kwTopN")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.kwTopN")}
+            <TooltipIcon text={t("form.kwTopNHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <input
             type="number"
             min={1}
@@ -351,7 +448,10 @@ export function ExportForm({
           />
         </label>
         <label className="form-field">
-          <span className="form-label">{t("form.kwMaxNgram")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.kwMaxNgram")}
+            <TooltipIcon text={t("form.kwMaxNgramHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <input
             type="number"
             min={1}
@@ -362,7 +462,10 @@ export function ExportForm({
           />
         </label>
         <label className="form-field">
-          <span className="form-label">{t("form.sleep")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.sleep")}
+            <TooltipIcon text={t("form.sleepHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <input
             type="number"
             min={0}
@@ -375,7 +478,10 @@ export function ExportForm({
         </label>
         {mode === "auto" && (
           <label className="form-field">
-            <span className="form-label">{t("form.searchSleep")}</span>
+            <span className="form-label inline-flex items-center">
+              {t("form.searchSleep")}
+              <TooltipIcon text={t("form.searchSleepHelp")} alt={t("form.tooltipAlt")} />
+            </span>
             <input
               type="number"
               min={0}
@@ -391,7 +497,10 @@ export function ExportForm({
 
       <section className="grid gap-4 md:grid-cols-2">
         <label className="form-field">
-          <span className="form-label">{t("form.hhToken")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.hhToken")}
+            <TooltipIcon text={t("form.hhTokenHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <input
             type="password"
             value={hhToken}
@@ -401,7 +510,10 @@ export function ExportForm({
           />
         </label>
         <label className="form-field">
-          <span className="form-label">{t("form.apiKey")}</span>
+          <span className="form-label inline-flex items-center">
+            {t("form.apiKey")}
+            <TooltipIcon text={t("form.apiKeyHelp")} alt={t("form.tooltipAlt")} />
+          </span>
           <input
             type="password"
             value={apiKey}

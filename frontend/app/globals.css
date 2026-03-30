@@ -361,6 +361,11 @@ a {
   color: color-mix(in srgb, var(--muted), var(--text) 25%);
 }
 
+/* Tooltip icon is black; invert in dark theme for contrast */
+[data-theme="dark"] .hh-tooltip-icon {
+  filter: invert(1);
+}
+
 .input-ui {
   border: 1px solid var(--glass-border);
   background: var(--glass-bg-strong);
