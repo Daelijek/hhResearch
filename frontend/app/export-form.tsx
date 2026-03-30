@@ -62,8 +62,7 @@ export function ExportForm({
   const [error, setError] = useState<string | null>(null);
   const [statsStatus, setStatsStatus] = useState<"idle" | "ok" | "missing" | "bad">("idle");
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function doExport() {
     setError(null);
     setMessage(null);
     setStatsStatus("idle");
@@ -190,8 +189,13 @@ export function ExportForm({
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await doExport();
+  }
+
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6" aria-label={t("analyze.title")}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6" aria-label={t("analyze.title")}>
       {!baseUrl && (
         <p
           className="rounded-xl border px-4 py-3 text-sm"
@@ -377,9 +381,10 @@ export function ExportForm({
       )}
 
       <button
-        type="submit"
+        type="button"
         disabled={busy}
         className="btn-primary w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        onClick={() => void doExport()}
       >
         {busy ? t("form.btnBusy") : t("form.btnReady")}
       </button>
