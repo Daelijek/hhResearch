@@ -1,0 +1,55 @@
+############################
+# Python / FastAPI project  #
+############################
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Tests / coverage / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Local env files (keep secrets out of git)
+.env
+.env.*
+
+############################
+# Project runtime outputs   #
+############################
+
+# Generated Excel reports
+reports/
+
+# Background jobs artifacts (RQ/Redis job data, results, etc.)
+jobs/
+
+############################
+# IDE / OS files            #
+############################
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
