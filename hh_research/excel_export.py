@@ -15,6 +15,8 @@ DEFAULT_COL_WIDTHS: dict[int, float] = {
     3: 32.0,  # skills
     4: 14.0,  # id
     5: 48.0,  # link
+    6: 32.0,  # unique keywords
+    7: 32.0,  # unique skills
 }
 
 # Header: bold 12pt, each column own background (Excel-style palette, white text)
@@ -24,6 +26,8 @@ HEADER_FILLS: dict[int, str] = {
     3: "70AD47",  # green
     4: "7030A0",  # purple
     5: "00B0F0",  # cyan
+    6: "A5A5A5",  # gray (unique keywords)
+    7: "FFC000",  # amber (unique skills)
 }
 
 DUPLICATE_FILL_HEX = "C6EFCE"  # light green (Excel-style) for repeated values
@@ -84,6 +88,8 @@ def create_export_workbook(sheet_name: str = "Sheet1") -> Tuple[Workbook, Worksh
     ws.cell(1, 3, "Key Skills (...)")
     ws.cell(1, 4, "ID")
     ws.cell(1, 5, "Link")
+    ws.cell(1, 6, "Unique Keywords")
+    ws.cell(1, 7, "Unique Skills")
     return wb, ws
 
 
@@ -94,6 +100,8 @@ def style_export_column_widths(
     col_skills: int,
     col_id: int,
     col_link: int,
+    col_unique_keywords: int,
+    col_unique_skills: int,
 ) -> None:
     mapping = {
         col_title: DEFAULT_COL_WIDTHS[1],
@@ -101,6 +109,8 @@ def style_export_column_widths(
         col_skills: DEFAULT_COL_WIDTHS[3],
         col_id: DEFAULT_COL_WIDTHS[4],
         col_link: DEFAULT_COL_WIDTHS[5],
+        col_unique_keywords: DEFAULT_COL_WIDTHS[6],
+        col_unique_skills: DEFAULT_COL_WIDTHS[7],
     }
     for col_idx, w in mapping.items():
         ws.column_dimensions[get_column_letter(col_idx)].width = w
@@ -114,8 +124,19 @@ def style_export_header_row(
     col_skills: int,
     col_id: int,
     col_link: int,
+    col_unique_keywords: int,
+    col_unique_skills: int,
 ) -> None:
-    cols = (col_title, col_keywords, col_skills, col_id, col_link)
+    # Relative ordering matters for HEADER_FILLS palette.
+    cols = (
+        col_title,
+        col_keywords,
+        col_skills,
+        col_id,
+        col_link,
+        col_unique_keywords,
+        col_unique_skills,
+    )
     font = Font(bold=True, size=12, color="FFFFFF")
     align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     for i, c in enumerate(cols, start=1):
@@ -166,17 +187,36 @@ def finalize_export_sheet(
     col_skills: int,
     col_id: int,
     col_link: int,
+    col_unique_keywords: int,
+    col_unique_skills: int,
     *,
     header_row: int = 1,
     data_start_row: Optional[int] = None,
     style_headers: bool = True,
 ) -> None:
-    style_export_column_widths(ws, col_title, col_keywords, col_skills, col_id, col_link)
+    style_export_column_widths(
+        ws,
+        col_title,
+        col_keywords,
+        col_skills,
+        col_id,
+        col_link,
+        col_unique_keywords,
+        col_unique_skills,
+    )
     if style_headers:
         style_export_header_row(
-            ws, header_row, col_title, col_keywords, col_skills, col_id, col_link
+            ws,
+            header_row,
+            col_title,
+            col_keywords,
+            col_skills,
+            col_id,
+            col_link,
+            col_unique_keywords,
+            col_unique_skills,
         )
-    cols_scan = (col_title, col_keywords, col_skills, col_id, col_link)
+    cols_scan = (col_title, col_keywords, col_skills, col_id, col_link, col_unique_keywords, col_unique_skills)
     data_row = (
         data_start_row
         if data_start_row is not None

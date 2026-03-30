@@ -143,13 +143,58 @@ def run_export_on_worksheet(
         if on_progress and processed % 10 == 0:
             on_progress(processed, total)
 
+    # Unique columns are placed right after "Link" by default.
+    col_unique_keywords = col_link + 1
+    col_unique_skills = col_link + 2
+
+    # Ensure headers are present even when we don't restyle (CLI append uses format_headers=False).
+    ws.cell(1, col_unique_keywords, "Unique Keywords")
+    ws.cell(1, col_unique_skills, "Unique Skills")
+
+    # Popularity = frequency across the whole sheet (including already existing template content).
+    # We reconstruct it from filled values in Key Words / Key Skills columns.
+    keyword_freq_all: Counter[str] = Counter()
+    skill_freq_all: Counter[str] = Counter()
+    last_row = ws.max_row or 1
+    for r in range(2, last_row + 1):
+        kw_val = ws.cell(r, col_keywords).value
+        if kw_val is not None:
+            kw_str = str(kw_val).strip()
+            if kw_str:
+                keyword_freq_all[kw_str] += 1
+        sk_val = ws.cell(r, col_skills).value
+        if sk_val is not None:
+            sk_str = str(sk_val).strip()
+            if sk_str:
+                skill_freq_all[sk_str] += 1
+
+    # Clear previous unique lists (if template already had them) and rewrite fresh.
+    for r in range(2, last_row + 1):
+        ws.cell(r, col_unique_keywords).value = None
+        ws.cell(r, col_unique_skills).value = None
+
+    # Write unique values sorted by (-count) and then by text for deterministic ordering.
+    sorted_keywords = sorted(keyword_freq_all.items(), key=lambda x: (-x[1], x[0]))
+    sorted_skills = sorted(skill_freq_all.items(), key=lambda x: (-x[1], x[0]))
+
+    for i, (name, _count) in enumerate(sorted_keywords):
+        ws.cell(2 + i, col_unique_keywords, name)
+    for i, (name, _count) in enumerate(sorted_skills):
+        ws.cell(2 + i, col_unique_skills, name)
+
+    # Update top-* summary to match unique columns.
+    skill_freq = skill_freq_all
+    keyword_freq = keyword_freq_all
+
     finalize_export_sheet(
-        ws,
-        col_title,
-        col_keywords,
-        col_skills,
-        col_id,
-        col_link,
+        ws=ws,
+        col_title=col_title,
+        col_keywords=col_keywords,
+        col_skills=col_skills,
+        col_id=col_id,
+        col_link=col_link,
+        col_unique_keywords=col_unique_keywords,
+        col_unique_skills=col_unique_skills,
         header_row=1,
         data_start_row=None,
         style_headers=format_headers,
