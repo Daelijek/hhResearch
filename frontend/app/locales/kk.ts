@@ -69,7 +69,8 @@ export const kk = {
 
   "form.noApiUrl": "NEXT_PUBLIC_API_URL бос. .env.local-ды толтырып, Next.js-ті қайта іске қосыңыз.",
   "form.modeLegend": "Экспорт режимі",
-  "form.modeHelp": "Қолмен: нақты вакансияларды ID/URL арқылы шығару. Авто: сұраулармен HH-тан іздеп, табылған вакансияларды экспорттау.",
+  "form.modeHelpManual": "Қолмен: төмендегі тізімнен ID/URL арқылы нақты вакансияларды экспорттау.",
+  "form.modeHelpAuto": "Авто: HH-тан сұраулармен іздеп, табылған вакансияларды экспорттау.",
   "form.modeManual": "Қолмен: ID/URL",
   "form.modeAuto": "Авто: іздеу сұраулары",
   "form.manualLabel": "Вакансия ID немесе URL (бір жолға біреуден)",

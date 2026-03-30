@@ -349,7 +349,10 @@ export function ExportForm({
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <legend className="mb-2 inline-flex items-center text-sm font-medium text-[var(--muted)]">
           {t("form.modeLegend")}
-          <TooltipIcon text={t("form.modeHelp")} alt={t("form.tooltipAlt")} />
+          <TooltipIcon
+            text={mode === "manual" ? t("form.modeHelpManual") : t("form.modeHelpAuto")}
+            alt={t("form.tooltipAlt")}
+          />
         </legend>
         <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
           <input

@@ -67,7 +67,8 @@ export const en = {
 
   "form.noApiUrl": "NEXT_PUBLIC_API_URL is empty. Fill .env.local and restart Next.js.",
   "form.modeLegend": "Export mode",
-  "form.modeHelp": "Manual: export specific vacancies by ID/URL. Auto: search HH by queries and export found vacancies.",
+  "form.modeHelpManual": "Manual: export specific vacancies by ID/URL from the list below.",
+  "form.modeHelpAuto": "Auto: search HH by queries and export the found vacancies.",
   "form.modeManual": "Manual by IDs/URLs",
   "form.modeAuto": "Auto search by queries",
   "form.manualLabel": "Vacancy IDs or URLs (one per line)",

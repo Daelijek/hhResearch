@@ -67,7 +67,8 @@ export const ru = {
 
   "form.noApiUrl": "NEXT_PUBLIC_API_URL пуст. Заполните .env.local и перезапустите Next.js.",
   "form.modeLegend": "Режим выгрузки",
-  "form.modeHelp": "Manual: обработать конкретные вакансии по ID/URL. Auto: найти вакансии по поисковым запросам HH и выгрузить найденные.",
+  "form.modeHelpManual": "Manual: обработать конкретные вакансии по ID/URL из списка ниже.",
+  "form.modeHelpAuto": "Auto: найти вакансии по поисковым запросам HH и выгрузить найденные результаты.",
   "form.modeManual": "Ручной: ID/URL",
   "form.modeAuto": "Авто: поисковые запросы",
   "form.manualLabel": "ID или URL вакансий (по одному в строке)",
