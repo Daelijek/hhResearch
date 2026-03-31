@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { I18nProvider, useI18n, type Lang } from "./i18n";
-import { ThemeProvider, useTheme } from "./theme";
+import { I18nProvider, useI18n, type Lang } from "@/lib/i18n";
+import { ThemeProvider, useTheme } from "@/lib/theme";
 
 function LanguageSwitch() {
   const { lang, setLang, t } = useI18n();
@@ -142,4 +142,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </ThemeProvider>
   );
 }
-

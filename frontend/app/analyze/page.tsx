@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ExportFormPreset, ExportHistoryEntry, ExportSummary } from "../export-history";
-import { deleteExportHistoryEntry, loadExportHistory } from "../export-history";
-import { ExportForm } from "../export-form";
-import { useI18n } from "../i18n";
+import { ExportForm } from "@/components/export/export-form";
+import type { ExportFormPreset, ExportHistoryEntry, ExportSummary } from "@/lib/export-history";
+import { deleteExportHistoryEntry, loadExportHistory } from "@/lib/export-history";
+import { useI18n } from "@/lib/i18n";
 
 function VerticalBarChart({
   title,

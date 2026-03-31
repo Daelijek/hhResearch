@@ -1,15 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useI18n } from "./i18n";
+import { FaqDisclosure } from "@/components/landing/faq-disclosure";
+import { LandingExcelPreview } from "@/components/landing/excel-preview";
+import { LandingGlassCard } from "@/components/landing/glass-card";
+import { useI18n } from "@/lib/i18n";
+
+const FAQ_KEYS = [
+  ["landing.faqQ1", "landing.faqA1"],
+  ["landing.faqQ2", "landing.faqA2"],
+  ["landing.faqQ3", "landing.faqA3"],
+  ["landing.faqQ4", "landing.faqA4"],
+  ["landing.faqQ5", "landing.faqA5"],
+  ["landing.faqQ6", "landing.faqA6"],
+] as const;
+
+const REPORT_HOW_CARDS = [
+  ["01", "landing.reportHowCard1Title", "landing.reportHow1"],
+  ["02", "landing.reportHowCard2Title", "landing.reportHow2"],
+  ["03", "landing.reportHowCard3Title", "landing.reportHow3"],
+  ["04", "landing.reportHowCard4Title", "landing.reportHow4"],
+] as const;
 
 export default function Home() {
   const { t } = useI18n();
   const advantages = [
-    { icon: "01", title: t("landing.adv1Title"), text: t("landing.adv1Text") },
-    { icon: "02", title: t("landing.adv2Title"), text: t("landing.adv2Text") },
-    { icon: "03", title: t("landing.adv3Title"), text: t("landing.adv3Text") },
-    { icon: "04", title: t("landing.adv4Title"), text: t("landing.adv4Text") },
+    { num: "01", title: t("landing.adv1Title"), text: t("landing.adv1Text") },
+    { num: "02", title: t("landing.adv2Title"), text: t("landing.adv2Text") },
+    { num: "03", title: t("landing.adv3Title"), text: t("landing.adv3Text") },
+    { num: "04", title: t("landing.adv4Title"), text: t("landing.adv4Text") },
   ];
 
   return (
@@ -40,15 +59,31 @@ export default function Home() {
                 </a>
               </div>
             </div>
-            <aside className="card-soft anim-fade-up p-4 sm:p-6 md:p-8">
-              <h2 className="text-lg font-semibold">{t("landing.whatYouGet")}</h2>
-              <ul className="mt-4 space-y-3 text-sm text-[var(--muted)]">
-                <li>- {t("landing.out1")}</li>
-                <li>- {t("landing.out2")}</li>
-                <li>- {t("landing.out3")}</li>
-              </ul>
-            </aside>
+            <LandingExcelPreview t={t} />
           </div>
+        </div>
+      </section>
+
+      <section id="report-how" className="container-shell py-12 md:py-16">
+        <h2 className="section-title">{t("landing.reportHowTitle")}</h2>
+        <p className="section-subtitle">{t("landing.reportHowSubtitle")}</p>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {REPORT_HOW_CARDS.map(([num, titleKey, textKey]) => (
+            <LandingGlassCard
+              key={num}
+              shine
+              leading={
+                <div
+                  className="text-2xl font-semibold text-[var(--primary)] tabular-nums"
+                  aria-hidden
+                >
+                  {num}
+                </div>
+              }
+              title={t(titleKey)}
+              description={t(textKey)}
+            />
+          ))}
         </div>
       </section>
 
@@ -57,13 +92,16 @@ export default function Home() {
         <p className="section-subtitle">{t("landing.advantagesSubtitle")}</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {advantages.map((item) => (
-            <article key={item.title} className="card-soft anim-fade-up p-5">
-              <div className="text-2xl font-semibold text-[var(--primary)]" aria-hidden>
-                {item.icon}
-              </div>
-              <h3 className="mt-3 text-base font-semibold">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.text}</p>
-            </article>
+            <LandingGlassCard
+              key={item.title}
+              leading={
+                <div className="text-2xl font-semibold text-[var(--primary)]" aria-hidden>
+                  {item.num}
+                </div>
+              }
+              title={item.title}
+              description={item.text}
+            />
           ))}
         </div>
       </section>
@@ -71,16 +109,23 @@ export default function Home() {
       <section id="how" className="container-shell py-12 md:py-16">
         <h2 className="section-title">{t("landing.howTitle")}</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {[
-            ["1", t("landing.step1Title"), t("landing.step1Text")],
-            ["2", t("landing.step2Title"), t("landing.step2Text")],
-            ["3", t("landing.step3Title"), t("landing.step3Text")],
-          ].map(([step, title, text]) => (
-            <article key={step} className="card-soft anim-fade-up p-5">
-              <p className="text-sm font-semibold text-[var(--primary)]">Step {step}</p>
-              <h3 className="mt-2 text-base font-semibold">{title}</h3>
-              <p className="mt-2 text-sm text-[var(--muted)]">{text}</p>
-            </article>
+          {(
+            [
+              ["1", t("landing.step1Title"), t("landing.step1Text")],
+              ["2", t("landing.step2Title"), t("landing.step2Text")],
+              ["3", t("landing.step3Title"), t("landing.step3Text")],
+            ] as const
+          ).map(([step, title, text]) => (
+            <LandingGlassCard
+              key={step}
+              leading={
+                <p className="text-sm font-semibold text-[var(--primary)]">
+                  {t("landing.stepBadge", { n: step })}
+                </p>
+              }
+              title={title}
+              description={text}
+            />
           ))}
         </div>
       </section>
@@ -89,20 +134,12 @@ export default function Home() {
         <div className="card-soft px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
           <h2 className="section-title">{t("landing.faqTitle")}</h2>
           <div className="mt-6 space-y-4">
-            <details className="surface-glass-sm p-4">
-              <summary className="cursor-pointer font-medium">{t("landing.faqQ1")}</summary>
-              <p className="mt-2 text-sm text-[var(--muted)]">{t("landing.faqA1")}</p>
-            </details>
-            <details className="surface-glass-sm p-4">
-              <summary className="cursor-pointer font-medium">{t("landing.faqQ2")}</summary>
-              <p className="mt-2 text-sm text-[var(--muted)]">{t("landing.faqA2")}</p>
-            </details>
+            {FAQ_KEYS.map(([qKey, aKey]) => (
+              <FaqDisclosure key={qKey} question={t(qKey)} answer={t(aKey)} />
+            ))}
           </div>
           <div className="mt-8">
-            <Link
-              href="/analyze"
-              className="btn-primary px-5 py-3 text-sm font-semibold"
-            >
+            <Link href="/analyze" className="btn-primary px-5 py-3 text-sm font-semibold">
               {t("landing.faqCta")}
             </Link>
           </div>
