@@ -1,61 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ExportForm } from "@/components/export/export-form";
 import type { ExportFormPreset, ExportHistoryEntry, ExportSummary } from "@/lib/export-history";
 import { deleteExportHistoryEntry, loadExportHistory } from "@/lib/export-history";
 import { useI18n } from "@/lib/i18n";
-
-function VerticalBarChart({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ name: string; count: number }>;
-}) {
-  const top = items.slice(0, 10);
-  const max = top[0]?.count ?? 0;
-  return (
-    <section className="card-soft glass-shine anim-fade-up p-4 sm:p-5">
-      <h2 className="text-base font-semibold lg:text-lg">{title}</h2>
-      {top.length === 0 ? (
-        <p className="mt-3 text-sm text-[var(--muted)] lg:text-base">-</p>
-      ) : (
-        <div className="mt-5 grid gap-4">
-          <div className="-mx-1 overflow-x-auto overscroll-x-contain pb-1 sm:mx-0">
-            <div className="min-w-[min(100%,320px)] px-1 sm:min-w-0 sm:px-0">
-              <div className="flex h-44 items-end gap-2">
-                {top.map((it) => (
-                  <div key={it.name} className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-2">
-                    <div className="text-[10px] tabular-nums text-[var(--muted)]">{it.count}</div>
-                    <div className="relative h-28 w-full overflow-hidden rounded-md border border-[var(--glass-border)] bg-[color:var(--glass-bg-strong)] sm:rounded-lg">
-                      <div
-                        className="absolute bottom-0 left-0 right-0 rounded-md bg-[var(--primary)] sm:rounded-lg"
-                        style={{ height: `${max ? Math.max(6, Math.round((it.count / max) * 100)) : 0}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                {top.map((it) => (
-                  <div
-                    key={it.name}
-                    className="flex min-w-0 flex-1 basis-0 flex-col items-center text-[10px] text-[var(--muted)]"
-                  >
-                    <span className="block max-w-full truncate text-center" title={it.name}>
-                      {it.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
+import { SummaryView } from "@/components/summary/summary-view";
 
 export default function AnalyzePage() {
   const { t } = useI18n();
@@ -82,16 +32,6 @@ export default function AnalyzePage() {
     deleteExportHistoryEntry(id);
     setHistory((prev) => prev.filter((e) => e.id !== id));
   }
-
-  const stats = useMemo(() => {
-    if (!summary) return null;
-    return [
-      { label: "Requested", value: summary.requested },
-      { label: "Processed", value: summary.processed },
-      { label: "Errors", value: summary.errors },
-      { label: "Unique skills (top20)", value: summary.top_skills.length },
-    ];
-  }, [summary]);
 
   return (
     <section className="container-shell py-6 sm:py-10 md:py-14">
@@ -192,77 +132,9 @@ export default function AnalyzePage() {
         </aside>
       </div>
 
-      {stats && summary && (
-        <section className="mt-6 grid gap-4 sm:mt-10 sm:gap-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-            {stats.map((s) => (
-              <div key={s.label} className="glass-shine surface-glass-sm p-3 sm:p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{s.label}</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums">{s.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {summary.dedup && (
-            <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.dedupTitle")}</h2>
-              <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.dedupInput")}</dt>
-                  <dd className="font-semibold tabular-nums">{summary.dedup.input_count}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.dedupUnique")}</dt>
-                  <dd className="font-semibold tabular-nums">{summary.dedup.unique_count}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.dedupRemoved")}</dt>
-                  <dd className="font-semibold tabular-nums">{summary.dedup.duplicates_removed}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
-
-          {summary.coverage && (
-            <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.coverageTitle")}</h2>
-              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.coverageKeySkillsPct")}</dt>
-                  <dd className="font-semibold tabular-nums">
-                    {(summary.coverage.key_skills_rate * 100).toFixed(1)}% ({summary.coverage.with_key_skills} / {summary.coverage.successful})
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.coverageNoSkills")}</dt>
-                  <dd className="font-semibold tabular-nums">{summary.coverage.without_key_skills}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--muted)]">{t("analyze.coverageNoDescription")}</dt>
-                  <dd className="font-semibold tabular-nums">{summary.coverage.without_description}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
-
-          {summary.error_breakdown && summary.error_breakdown.length > 0 && (
-            <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.errorsByReason")}</h2>
-              <ul className="mt-3 space-y-2 text-sm">
-                {summary.error_breakdown.map((row) => (
-                  <li key={row.reason} className="flex justify-between gap-3 border-b border-[var(--glass-border)] pb-2 last:border-0">
-                    <span className="min-w-0 break-words text-[var(--muted)]">{row.reason}</span>
-                    <span className="shrink-0 tabular-nums font-medium">{row.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <VerticalBarChart title="Top skills" items={summary.top_skills} />
-            <VerticalBarChart title="Top keywords" items={summary.top_keywords} />
-          </div>
+      {summary && (
+        <section className="mt-6 sm:mt-10">
+          <SummaryView summary={summary} />
         </section>
       )}
     </section>

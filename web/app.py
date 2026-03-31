@@ -13,13 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from hh_research.client import dedupe_vacancy_refs_preserve_order, refs_from_lines
+from hh_research.client import (
+    dedupe_vacancy_refs_preserve_order,
+    refs_from_lines,
+    search_employers,
+    fetch_dictionaries,
+    fetch_areas,
+)
 from hh_research.job_queue import (
     enqueue_export_job,
     get_job_result_path,
     get_job_status,
 )
-from hh_research.pipeline import collect_refs_auto, export_refs_to_xlsx_bytes
+from hh_research.pipeline import collect_refs_auto, export_refs_to_xlsx_bytes, compute_summary_for_refs
 
 MAX_VACANCIES_PER_REQUEST = int(os.environ.get("HH_EXPORT_MAX_VACANCIES", "100"))
 
@@ -91,6 +97,25 @@ class AutoExportBody(BaseModel):
     token: Optional[str] = None
     sleep_s: float = Field(0.2, ge=0, le=5)
     search_sleep_s: float = Field(0.2, ge=0, le=5)
+    employer_id: Optional[str] = None
+    area: Optional[str] = None
+    experience: Optional[str] = None
+    period: Optional[int] = Field(None, ge=1, le=30)
+
+
+class SummaryAutoBody(BaseModel):
+    queries: list[str] = Field(..., min_length=1, max_length=50)
+    pages: int = Field(2, ge=1, le=20)
+    per_page: int = Field(100, ge=1, le=100)
+    kw_top_n: int = Field(30, ge=1, le=200)
+    kw_max_ngram: int = Field(3, ge=1, le=5)
+    token: Optional[str] = None
+    sleep_s: float = Field(0.2, ge=0, le=5)
+    search_sleep_s: float = Field(0.2, ge=0, le=5)
+    employer_id: Optional[str] = None
+    area: Optional[str] = None
+    experience: Optional[str] = None
+    period: Optional[int] = Field(None, ge=1, le=30)
 
 
 def _attachment_filename(prefix: str) -> str:
@@ -192,6 +217,10 @@ def export_auto(
             per_page=body.per_page,
             dedupe_vacancies=True,
             search_sleep_s=body.search_sleep_s,
+            employer_id=body.employer_id,
+            area=body.area,
+            experience=body.experience,
+            period=body.period,
         )
     except Exception as e:
         logger.exception("collect_refs_auto failed (request_id=%s)", request_id)
@@ -260,6 +289,106 @@ def export_auto(
             **out_headers,
         },
     )
+
+
+@app.get("/api/v1/meta/dictionaries")
+def meta_dictionaries(
+    token: Optional[str] = None,
+    _: Annotated[None, Depends(_require_api_key)] = None,
+) -> dict:
+    session = requests.Session()
+    eff = _effective_token(token)
+    return fetch_dictionaries(session=session, token=eff)
+
+
+@app.get("/api/v1/meta/areas")
+def meta_areas(
+    token: Optional[str] = None,
+    _: Annotated[None, Depends(_require_api_key)] = None,
+) -> list:
+    session = requests.Session()
+    eff = _effective_token(token)
+    return fetch_areas(session=session, token=eff)
+
+
+@app.get("/api/v1/meta/employers")
+def meta_employers(
+    text: str,
+    area: Optional[str] = None,
+    token: Optional[str] = None,
+    _: Annotated[None, Depends(_require_api_key)] = None,
+) -> dict:
+    session = requests.Session()
+    eff = _effective_token(token)
+    return search_employers(session=session, token=eff, text=text, area=area, only_with_vacancies=True)
+
+
+@app.post("/api/v1/summary/auto")
+def summary_auto(
+    body: SummaryAutoBody,
+    _: Annotated[None, Depends(_require_api_key)],
+    response: Response,
+) -> dict:
+    request_id = str(uuid4())
+    response.headers["X-Request-Id"] = request_id
+
+    session = requests.Session()
+    token = _effective_token(body.token)
+
+    try:
+        refs, raw_id_hits = collect_refs_auto(
+            session=session,
+            token=token,
+            queries=body.queries,
+            pages=body.pages,
+            per_page=body.per_page,
+            dedupe_vacancies=True,
+            search_sleep_s=body.search_sleep_s,
+            employer_id=body.employer_id,
+            area=body.area,
+            experience=body.experience,
+            period=body.period,
+        )
+    except Exception as e:
+        logger.exception("summary_auto search failed (request_id=%s)", request_id)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "search_failed", "message": "Internal error while searching vacancies."},
+            headers={"X-Request-Id": request_id},
+        ) from e
+
+    if len(refs) > MAX_VACANCIES_PER_REQUEST:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "too_many_vacancies",
+                "message": (
+                    f"Search returned {len(refs)} vacancies; max per request is {MAX_VACANCIES_PER_REQUEST}. "
+                    "Reduce pages, per_page, or queries."
+                ),
+                "max": MAX_VACANCIES_PER_REQUEST,
+                "search_count": len(refs),
+            },
+            headers={"X-Request-Id": request_id},
+        )
+
+    errors, summary = compute_summary_for_refs(
+        refs=refs,
+        session=session,
+        token=token,
+        kw_top_n=body.kw_top_n,
+        kw_max_ngram=body.kw_max_ngram,
+        sleep_s=body.sleep_s,
+    )
+    if errors:
+        response.headers["X-Export-Warnings"] = str(len(errors))
+
+    summary["dedup"] = {
+        "input_count": raw_id_hits,
+        "unique_count": len(refs),
+        "duplicates_removed": max(0, raw_id_hits - len(refs)),
+    }
+    return {"summary": summary}
 
 
 @app.post("/api/v1/export/manual/async")

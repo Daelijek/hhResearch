@@ -110,6 +110,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const path = pathname ?? "";
   const isHomeActive = path === "/" || path === "";
   const isAnalyzeActive = path === "/analyze" || path.startsWith("/analyze/");
+  const isSummaryActive = path === "/summary" || path.startsWith("/summary/");
 
   const desktopNavInactive =
     "inline-flex items-center rounded-lg px-2.5 py-2 font-semibold leading-none text-[var(--muted)] transition hover:bg-[color:var(--glass-bg-strong)] hover:text-[var(--text)] sm:px-3 sm:py-2.5 md:h-11 md:py-0";
@@ -148,6 +149,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               aria-current={isAnalyzeActive ? "page" : undefined}
             >
               {t("nav.analyze")}
+            </Link>
+            <Link
+              href="/summary"
+              className={isSummaryActive ? desktopNavActive : desktopNavInactive}
+              aria-current={isSummaryActive ? "page" : undefined}
+            >
+              {t("nav.summary")}
             </Link>
           </nav>
 
@@ -233,6 +241,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               >
                 {t("nav.analyze")}
               </Link>
+              <Link
+                href="/summary"
+                className={mobileNavLink}
+                aria-current={isSummaryActive ? "page" : undefined}
+              >
+                {t("nav.summary")}
+              </Link>
             </nav>
             <div className="flex flex-col gap-2 mt-4 border-t border-[var(--glass-border)] pt-4">
               <ThemeSwitch variant="drawer" />
@@ -261,6 +276,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               <li>
                 <Link href="/analyze" className="hover:text-[var(--text)]">
                   {t("nav.analyze")}
+                </Link>
+              </li>
+              <li>
+                <Link href="/summary" className="hover:text-[var(--text)]">
+                  {t("nav.summary")}
                 </Link>
               </li>
             </ul>

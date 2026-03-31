@@ -122,7 +122,10 @@ def search_vacancies(
     query: str,
     page: int,
     per_page: int,
-    *,
+    employer_id: Optional[str] = None,
+    area: Optional[str] = None,
+    experience: Optional[str] = None,
+    period: Optional[int] = None,
     timeout_s: float = 30.0,
     retries: int = 3,
 ) -> List[dict]:
@@ -131,6 +134,14 @@ def search_vacancies(
         "page": page,
         "per_page": per_page,
     }
+    if employer_id:
+        params["employer_id"] = employer_id
+    if area:
+        params["area"] = area
+    if experience:
+        params["experience"] = experience
+    if period is not None:
+        params["period"] = int(period)
     data = hh_get_json(
         f"{HH_API_BASE}/vacancies",
         session=session,
@@ -141,6 +152,74 @@ def search_vacancies(
     )
     return data.get("items", []) or []
 
+
+def search_employers(
+    session: requests.Session,
+    token: Optional[str],
+    text: str,
+    *,
+    area: Optional[str] = None,
+    only_with_vacancies: bool = True,
+    page: int = 0,
+    per_page: int = 20,
+    timeout_s: float = 30.0,
+    retries: int = 3,
+) -> dict:
+    """
+    GET /employers
+    https://api.hh.ru/openapi/redoc#tag/Rabotodateli/operation/get-employers
+    """
+    params: Dict[str, Any] = {
+        "text": text,
+        "page": page,
+        "per_page": per_page,
+        "only_with_vacancies": "true" if only_with_vacancies else "false",
+    }
+    if area:
+        params["area"] = area
+    return hh_get_json(
+        f"{HH_API_BASE}/employers",
+        session=session,
+        token=token,
+        params=params,
+        timeout_s=timeout_s,
+        retries=retries,
+    )
+
+
+def fetch_dictionaries(
+    session: requests.Session,
+    token: Optional[str],
+    *,
+    timeout_s: float = 30.0,
+    retries: int = 3,
+) -> dict:
+    return hh_get_json(
+        f"{HH_API_BASE}/dictionaries",
+        session=session,
+        token=token,
+        params=None,
+        timeout_s=timeout_s,
+        retries=retries,
+    )
+
+
+def fetch_areas(
+    session: requests.Session,
+    token: Optional[str],
+    *,
+    timeout_s: float = 30.0,
+    retries: int = 3,
+) -> list:
+    data = hh_get_json(
+        f"{HH_API_BASE}/areas",
+        session=session,
+        token=token,
+        params=None,
+        timeout_s=timeout_s,
+        retries=retries,
+    )
+    return data if isinstance(data, list) else []
 
 def fetch_vacancy(
     session: requests.Session,

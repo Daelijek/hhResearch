@@ -42,6 +42,11 @@ def collect_refs_auto(
     per_page: int,
     dedupe_vacancies: bool,
     search_sleep_s: float,
+    *,
+    employer_id: Optional[str] = None,
+    area: Optional[str] = None,
+    experience: Optional[str] = None,
+    period: Optional[int] = None,
 ) -> Tuple[List[VacancyRef], int]:
     """Returns (unique_refs, raw_id_hits) where raw_id_hits counts every search item with a valid id (incl. duplicates)."""
     seen_ids: set[str] = set()
@@ -49,7 +54,17 @@ def collect_refs_auto(
     raw_id_hits = 0
     for q in queries:
         for page in range(pages):
-            items = search_vacancies(session, token, q, page=page, per_page=per_page)
+            items = search_vacancies(
+                session,
+                token,
+                q,
+                page=page,
+                per_page=per_page,
+                employer_id=employer_id,
+                area=area,
+                experience=experience,
+                period=period,
+            )
             for it in items:
                 vid = str(it.get("id") or "").strip()
                 if not vid:
@@ -63,6 +78,81 @@ def collect_refs_auto(
             if search_sleep_s > 0:
                 time.sleep(search_sleep_s)
     return vacancy_ids_to_process, raw_id_hits
+
+
+def compute_summary_for_refs(
+    refs: List[VacancyRef],
+    session: requests.Session,
+    token: Optional[str],
+    *,
+    kw_top_n: int,
+    kw_max_ngram: int,
+    sleep_s: float,
+) -> Tuple[List[str], Dict[str, Any]]:
+    total = len(refs)
+    processed = 0
+    errors: List[str] = []
+    keyword_freq: Counter[str] = Counter()
+    skill_freq: Counter[str] = Counter()
+    with_key_skills = 0
+    without_key_skills = 0
+    without_description = 0
+
+    for ref in refs:
+        vid = ref.vacancy_id
+        try:
+            vac = fetch_vacancy(session, token, vid)
+        except Exception as e:
+            errors.append(f"{vid}: {e}")
+            continue
+
+        _title, _vid, _link, keywords, skill_names = extract_skills_and_keywords(
+            vac,
+            kw_top_n=kw_top_n,
+            kw_max_ngram=kw_max_ngram,
+        )
+        for s in skill_names:
+            if s:
+                skill_freq[s] += 1
+        for k in keywords:
+            if k:
+                keyword_freq[k] += 1
+
+        if skill_names:
+            with_key_skills += 1
+        else:
+            without_key_skills += 1
+        if not (vac.get("description") or "").strip():
+            without_description += 1
+
+        processed += 1
+        if sleep_s > 0:
+            time.sleep(sleep_s)
+
+    reason_counter: Counter[str] = Counter()
+    for msg in errors:
+        reason = msg.split(": ", 1)[1].strip() if ": " in msg else msg.strip()
+        if len(reason) > 220:
+            reason = reason[:217] + "..."
+        reason_counter[reason] += 1
+
+    successful = processed
+    summary: Dict[str, Any] = {
+        "requested": total,
+        "processed": processed,
+        "errors": len(errors),
+        "top_skills": [{"name": k, "count": v} for k, v in skill_freq.most_common(20)],
+        "top_keywords": [{"name": k, "count": v} for k, v in keyword_freq.most_common(20)],
+        "coverage": {
+            "successful": successful,
+            "with_key_skills": with_key_skills,
+            "without_key_skills": without_key_skills,
+            "without_description": without_description,
+            "key_skills_rate": round(with_key_skills / successful, 4) if successful else 0.0,
+        },
+        "error_breakdown": [{"reason": r, "count": c} for r, c in reason_counter.most_common(10)],
+    }
+    return errors, summary
 
 
 def run_export_on_worksheet(
