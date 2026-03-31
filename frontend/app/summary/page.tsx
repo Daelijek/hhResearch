@@ -199,13 +199,13 @@ export default function SummaryPage() {
           setError(t("form.errSearchFailed"));
           return;
         }
-        setError(apiErr.message || resp.statusText || "Unknown error");
+        setError(apiErr.message || resp.statusText || t("summary.errUnknown"));
         return;
       }
       const json = (await resp.json()) as any;
       const s = json?.summary as ExportSummary | undefined;
       if (!s) {
-        setError("Bad response: missing summary");
+        setError(t("summary.errBadResponse"));
         return;
       }
       setSummary(s);

@@ -10,10 +10,10 @@ export function SummaryView({ summary }: { summary: ExportSummary }) {
   const { t } = useI18n();
 
   const stats = [
-    { label: "Requested", value: summary.requested },
-    { label: "Processed", value: summary.processed },
-    { label: "Errors", value: summary.errors },
-    { label: "Unique skills (top20)", value: summary.top_skills.length },
+    { label: t("summary.kpi.requested"), value: summary.requested },
+    { label: t("summary.kpi.processed"), value: summary.processed },
+    { label: t("summary.kpi.errors"), value: summary.errors },
+    { label: t("summary.kpi.uniqueSkills"), value: summary.top_skills.length },
   ];
 
   return (

@@ -142,6 +142,8 @@ export const en = {
   "summary.filtersTip3": "If you see rate limit errors, increase pauses in Advanced settings.",
   "summary.periodLabel": "Period (days, last N)",
   "summary.periodPh": "1..30",
+  "summary.errUnknown": "Unknown error",
+  "summary.errBadResponse": "Bad response from API.",
 
   "summary.qualityTitle": "Data quality",
   "summary.donut.successful": "successful",
@@ -149,6 +151,11 @@ export const en = {
   "summary.donut.noKeySkills": "No key_skills",
   "summary.donut.emptyDescription": "Empty description",
   "summary.donut.errors": "Errors",
+
+  "summary.kpi.requested": "Requested",
+  "summary.kpi.processed": "Processed",
+  "summary.kpi.errors": "Errors",
+  "summary.kpi.uniqueSkills": "Unique skills (top 20)",
 
   "summary.topSkillsTitle": "Top skills (top 20)",
   "summary.topKeywordsTitle": "Top phrases (top 20)",

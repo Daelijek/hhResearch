@@ -143,6 +143,8 @@ export const ru = {
   "summary.filtersTip3": "Если видите ошибки лимитов, увеличьте паузы в «Доп. настройках».",
   "summary.periodLabel": "Период (дней, последние N)",
   "summary.periodPh": "1..30",
+  "summary.errUnknown": "Неизвестная ошибка",
+  "summary.errBadResponse": "Некорректный ответ от API.",
 
   "summary.qualityTitle": "Качество данных",
   "summary.donut.successful": "успешно",
@@ -150,6 +152,11 @@ export const ru = {
   "summary.donut.noKeySkills": "Без key_skills",
   "summary.donut.emptyDescription": "Пустое описание",
   "summary.donut.errors": "Ошибки",
+
+  "summary.kpi.requested": "Запрошено",
+  "summary.kpi.processed": "Обработано",
+  "summary.kpi.errors": "Ошибок",
+  "summary.kpi.uniqueSkills": "Уникальные навыки (топ‑20)",
 
   "summary.topSkillsTitle": "Топ навыков (топ‑20)",
   "summary.topKeywordsTitle": "Топ фраз (топ‑20)",
