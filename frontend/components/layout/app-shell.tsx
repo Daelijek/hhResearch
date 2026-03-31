@@ -12,15 +12,15 @@ function LanguageSwitch({ variant = "toolbar" }: { variant?: "toolbar" | "drawer
   const options: Lang[] = ["en", "ru", "kk"];
   if (variant === "drawer") {
     return (
-      <div className="surface-glass-sm flex w-full gap-1 p-1 text-sm shadow-glassSoft">
+      <div className="surface-glass-sm flex h-10 w-full gap-1 p-1 text-sm shadow-glassSoft">
         {options.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => setLang(opt)}
-            className={`min-h-10 flex-1 rounded-lg px-2 py-2 font-semibold leading-none transition ${lang === opt
-                ? "bg-[var(--primary)] text-white shadow-sm"
-                : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
+            className={`h-full flex-1 rounded-xl px-2 py-0 font-semibold leading-none transition ${lang === opt
+              ? "bg-[var(--primary)] text-white shadow-sm"
+              : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
               }`}
             aria-label={`Switch to ${opt}`}
           >
@@ -32,26 +32,21 @@ function LanguageSwitch({ variant = "toolbar" }: { variant?: "toolbar" | "drawer
   }
 
   return (
-    <div className="surface-glass-sm flex h-11 shrink-0 items-stretch text-[10px] shadow-glassSoft sm:text-xs md:h-11">
-      {options.map((opt, idx) => {
-        const isFirst = idx === 0;
-        const isLast = idx === options.length - 1;
-        return (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => setLang(opt)}
-            className={`inline-flex h-full flex-1 items-center justify-center rounded-none px-2 py-0 leading-none transition sm:px-2.5 md:px-2.5 ${lang === opt
-                ? "bg-[var(--primary)] text-white"
-                : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
-              } ${isFirst ? "rounded-l-[0.95rem]" : ""} ${isLast ? "rounded-r-[0.95rem]" : ""
-              }`}
-            aria-label={`Switch to ${opt}`}
-          >
-            {t(`lang.${opt}`)}
-          </button>
-        );
-      })}
+    <div className="surface-glass-sm flex h-11 shrink-0 items-center gap-1 px-1 text-xs shadow-glassSoft sm:text-sm">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setLang(opt)}
+          className={`flex-1 rounded-xl px-2 py-2.5 font-semibold leading-none transition ${lang === opt
+            ? "bg-[var(--primary)] text-white shadow-sm"
+            : "text-[var(--muted)] hover:bg-[color:var(--glass-bg)]"
+            }`}
+          aria-label={`Switch to ${opt}`}
+        >
+          {t(`lang.${opt}`)}
+        </button>
+      ))}
     </div>
   );
 }
@@ -78,41 +73,6 @@ function ThemeSwitch({ variant = "toolbar" }: { variant?: "toolbar" | "drawer" }
         🌙
       </span>
       <span className="hh-theme-switch__knob" aria-hidden />
-    </button>
-  );
-}
-
-function MobileMenuButton({
-  open,
-  onToggle,
-}: {
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      className="btn-soft relative z-[80] inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--text)] md:hidden"
-      aria-expanded={open}
-      aria-controls="mobile-nav-panel"
-      aria-label={open ? t("nav.closeMenu") : t("nav.openMenu")}
-      onClick={onToggle}
-    >
-      <span className="flex h-3.5 w-5 flex-col justify-between" aria-hidden>
-        <span
-          className={`block h-0.5 w-full rounded-full bg-current transition duration-200 ${open ? "translate-y-[7px] rotate-45" : ""
-            }`}
-        />
-        <span
-          className={`block h-0.5 w-full rounded-full bg-current transition duration-200 ${open ? "opacity-0" : ""
-            }`}
-        />
-        <span
-          className={`block h-0.5 w-full rounded-full bg-current transition duration-200 ${open ? "-translate-y-[7px] -rotate-45" : ""
-            }`}
-        />
-      </span>
     </button>
   );
 }
@@ -157,7 +117,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     "btn-primary inline-flex shrink-0 items-center justify-center px-3 py-2 text-xs font-semibold leading-none sm:px-3.5 sm:py-2.5 sm:text-sm lg:text-base md:h-11 md:py-0";
 
   const mobileNavLink =
-    "surface-glass-sm block rounded-xl px-3 py-2.5 text-left text-[15px] font-semibold text-[var(--text)] transition hover:bg-[color:var(--glass-bg)]";
+    "surface-glass-sm flex min-h-10 items-center rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-[var(--text)] transition hover:bg-[color:var(--glass-bg)]";
 
   return (
     <>
@@ -170,6 +130,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             hhResearch
           </Link>
 
+          {/* Desktop navigation */}
           <nav
             aria-label="Primary navigation"
             className="hidden min-h-0 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap text-xs text-[var(--muted)] sm:gap-2 sm:text-sm md:flex md:text-base lg:text-[1.0625rem]"
@@ -191,63 +152,95 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="ml-auto flex h-11 shrink-0 items-center justify-center gap-1 sm:gap-2 md:ml-0 md:h-11">
+            {/* Desktop theme & language */}
             <div className="hidden items-center gap-1 sm:gap-2 md:flex md:h-11">
               <ThemeSwitch />
               <LanguageSwitch />
             </div>
-            <MobileMenuButton open={mobileNavOpen} onToggle={() => setMobileNavOpen((v) => !v)} />
-          </div>
-        </div>
 
-        {mobileNavOpen && (
-          <>
+            {/* Mobile burger button */}
             <button
               type="button"
-              className="fixed inset-0 z-[60] bg-black/35 backdrop-blur-[2px] dark:bg-black/50 md:hidden"
-              aria-label={t("nav.closeMenu")}
-              onClick={closeMobileNav}
-            />
-            <nav
-              id="mobile-nav-panel"
-              aria-label="Primary navigation"
-              className="hh-mobile-nav-panel fixed left-0 right-0 top-16 z-[70] overflow-hidden border-b border-[var(--glass-border)] bg-[color:var(--glass-bg)] px-4 pb-5 pt-4 shadow-[var(--glass-shadow)] sm:top-20 md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] text-[var(--text)] shadow-glassSoft transition hover:border-[var(--glass-border-strong)] hover:bg-[var(--glass-bg)] md:hidden"
+              aria-label={mobileNavOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileNavOpen}
+              aria-controls="hh-mobile-nav"
+              onClick={() => setMobileNavOpen((open) => !open)}
             >
-              <ul className="flex flex-col gap-2">
-                <li>
-                  <Link
-                    href="/"
-                    className={mobileNavLink}
-                    onClick={closeMobileNav}
-                  >
-                    {t("nav.home")}
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/analyze"
-                    className={mobileNavLink}
-                    onClick={closeMobileNav}
-                  >
-                    {t("nav.analyze")}
-                  </Link>
-                </li>
-              </ul>
-
-              <div className="mt-4 border-t border-[var(--glass-border)] pt-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  {t("nav.themeLabel")}
-                </p>
-                <ThemeSwitch variant="drawer" />
-
-                <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  {t("nav.languageLabel")}
-                </p>
-                <LanguageSwitch variant="drawer" />
-              </div>
-            </nav>
-          </>
-        )}
+              <span className="relative block h-4 w-5">
+                <span
+                  className={`absolute left-0 h-[2px] w-full rounded-full bg-[var(--text)] transition-transform duration-200 ${mobileNavOpen ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0"
+                    }`}
+                />
+                <span
+                  className={`absolute left-0 h-[2px] w-full rounded-full bg-[var(--text)] transition-opacity duration-150 ${mobileNavOpen ? "top-1/2 -translate-y-1/2 opacity-0" : "top-1/2 -translate-y-1/2 opacity-100"
+                    }`}
+                />
+                <span
+                  className={`absolute left-0 h-[2px] w-full rounded-full bg-[var(--text)] transition-transform duration-200 ${mobileNavOpen ? "bottom-1/2 translate-y-1/2 -rotate-45" : "bottom-0"
+                    }`}
+                />
+              </span>
+            </button>
+          </div>
+        </div>
       </header>
+
+      {/* Mobile navigation drawer */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 flex md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            aria-label="Close navigation menu"
+            onClick={closeMobileNav}
+          />
+          <div
+            id="hh-mobile-nav"
+            className="hh-mobile-nav-panel relative ml-auto flex h-full w-full max-w-xs flex-col border-l border-[var(--glass-border)] bg-[color:var(--glass-bg)] px-4 pb-6 pt-4 shadow-2xl"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-base font-semibold text-[var(--text)]">
+                hhResearch
+              </span>
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] text-[var(--text)] shadow-glassSoft transition hover:border-[var(--glass-border-strong)] hover:bg-[var(--glass-bg)]"
+                aria-label="Close navigation menu"
+                onClick={closeMobileNav}
+              >
+                <span className="sr-only">Close</span>
+                <span className="block text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            <nav aria-label="Mobile primary navigation" className="mt-4 flex flex-col gap-2">
+              <Link
+                href="/"
+                className={mobileNavLink}
+                aria-current={isHomeActive ? "page" : undefined}
+              >
+                {t("nav.home")}
+              </Link>
+              <Link
+                href="/analyze"
+                className={mobileNavLink}
+                aria-current={isAnalyzeActive ? "page" : undefined}
+              >
+                {t("nav.analyze")}
+              </Link>
+            </nav>
+            <div className="flex flex-col gap-2 mt-4 border-t border-[var(--glass-border)] pt-4">
+              <ThemeSwitch variant="drawer" />
+              <LanguageSwitch variant="drawer" />
+            </div>
+          </div>
+        </div>
+      )}
 
       <main>{children}</main>
 

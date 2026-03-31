@@ -20,7 +20,10 @@ export function LandingGlassCard({ leading, title, description, shine = false }:
       <span className="landing-glass-card__wash" aria-hidden />
       <div className="landing-glass-card__body">
         {leading}
-        <h3 className="mt-3 text-base font-semibold leading-snug text-[var(--text)] lg:text-lg">
+        <h3
+          className="landing-glass-card__title mt-3 text-base font-semibold leading-snug text-[var(--text)] lg:text-lg"
+          data-title={title}
+        >
           {title}
         </h3>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)] lg:mt-2.5 lg:text-base lg:leading-7">

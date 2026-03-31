@@ -131,7 +131,7 @@ export default function Home() {
       </section>
 
       <section className="container-shell py-10 md:py-16">
-        <div className="card-soft px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
+        <div className="card-soft faq-no-lift px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
           <h2 className="section-title">{t("landing.faqTitle")}</h2>
           <div className="mt-6 space-y-4">
             {FAQ_KEYS.map(([qKey, aKey]) => (
