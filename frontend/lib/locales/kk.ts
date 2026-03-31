@@ -1,6 +1,12 @@
 export const kk = {
   "nav.home": "Басты бет",
   "nav.analyze": "Талдау",
+  "nav.openMenu": "Мәзірді ашу",
+  "nav.closeMenu": "Мәзірді жабу",
+  "nav.themeLabel": "Тема",
+  "nav.languageLabel": "Тіл",
+  "nav.themeLight": "Жарық",
+  "nav.themeDark": "Қараңғы",
   "footer.about": "HH вакансияларынан нарық талаптарын алу, Excel есептің жұмыс істеуі.",
   "footer.navigation": "Навигация",
   "footer.contacts": "Байланыс",

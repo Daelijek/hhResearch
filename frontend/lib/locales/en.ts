@@ -1,6 +1,12 @@
 export const en = {
   "nav.home": "Home",
   "nav.analyze": "Analyze",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
+  "nav.themeLabel": "Theme",
+  "nav.languageLabel": "Language",
+  "nav.themeLight": "Light",
+  "nav.themeDark": "Dark",
   "footer.about": "Extract market requirements from HH vacancies and work with a clean Excel report.",
   "footer.navigation": "Navigation",
   "footer.contacts": "Contacts",

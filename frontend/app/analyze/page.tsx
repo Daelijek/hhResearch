@@ -17,9 +17,9 @@ function VerticalBarChart({
   const max = top[0]?.count ?? 0;
   return (
     <section className="card-soft glass-shine anim-fade-up p-4 sm:p-5">
-      <h2 className="text-base font-semibold">{title}</h2>
+      <h2 className="text-base font-semibold lg:text-lg">{title}</h2>
       {top.length === 0 ? (
-        <p className="mt-3 text-sm text-[var(--muted)]">-</p>
+        <p className="mt-3 text-sm text-[var(--muted)] lg:text-base">-</p>
       ) : (
         <div className="mt-5 grid gap-4">
           <div className="-mx-1 overflow-x-auto overscroll-x-contain pb-1 sm:mx-0">
@@ -97,14 +97,18 @@ export default function AnalyzePage() {
     <section className="container-shell py-6 sm:py-10 md:py-14">
       <header className="mb-6 anim-fade-up sm:mb-8">
         <p className="badge">{t("analyze.badge")}</p>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">{t("analyze.title")}</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">{t("analyze.subtitle")}</p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl">
+          {t("analyze.title")}
+        </h1>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-[var(--muted)] lg:max-w-3xl lg:text-lg">
+          {t("analyze.subtitle")}
+        </p>
       </header>
 
       <section className="mb-8">
-        <h2 className="text-base font-semibold">{t("analyze.historyTitle")}</h2>
+        <h2 className="text-base font-semibold lg:text-lg">{t("analyze.historyTitle")}</h2>
         {history.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">{t("analyze.historyEmpty")}</p>
+          <p className="mt-2 text-sm text-[var(--muted)] lg:text-base">{t("analyze.historyEmpty")}</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {history.map((entry) => (
@@ -171,16 +175,16 @@ export default function AnalyzePage() {
         </article>
         <aside className="space-y-4">
           <section className="card-soft glass-shine anim-fade-up p-4 sm:p-5">
-            <h2 className="text-base font-semibold">{t("analyze.limitsTitle")}</h2>
-            <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
+            <h2 className="text-base font-semibold lg:text-lg">{t("analyze.limitsTitle")}</h2>
+            <ul className="mt-3 space-y-2 text-sm text-[var(--muted)] lg:space-y-2.5 lg:text-base">
               <li>- {t("analyze.limit1")}</li>
               <li>- {t("analyze.limit2")}</li>
               <li>- {t("analyze.limit3")}</li>
             </ul>
           </section>
           <section className="card-soft glass-shine anim-fade-up p-4 sm:p-5">
-            <h2 className="text-base font-semibold">{t("analyze.exampleTitle")}</h2>
-            <pre className="mt-3 overflow-x-auto rounded-lg border border-[var(--glass-border)] bg-[color:var(--glass-bg-strong)] p-3 text-xs leading-6 text-[var(--text)] backdrop-blur-md">
+            <h2 className="text-base font-semibold lg:text-lg">{t("analyze.exampleTitle")}</h2>
+            <pre className="mt-3 overflow-x-auto rounded-lg border border-[var(--glass-border)] bg-[color:var(--glass-bg-strong)] p-3 text-xs leading-6 text-[var(--text)] backdrop-blur-md lg:p-4 lg:text-sm lg:leading-7">
               131474430
               https://hh.ru/vacancy/131234053
             </pre>
@@ -201,7 +205,7 @@ export default function AnalyzePage() {
 
           {summary.dedup && (
             <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold">{t("analyze.dedupTitle")}</h2>
+              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.dedupTitle")}</h2>
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
                 <div>
                   <dt className="text-[var(--muted)]">{t("analyze.dedupInput")}</dt>
@@ -221,7 +225,7 @@ export default function AnalyzePage() {
 
           {summary.coverage && (
             <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold">{t("analyze.coverageTitle")}</h2>
+              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.coverageTitle")}</h2>
               <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-[var(--muted)]">{t("analyze.coverageKeySkillsPct")}</dt>
@@ -243,7 +247,7 @@ export default function AnalyzePage() {
 
           {summary.error_breakdown && summary.error_breakdown.length > 0 && (
             <div className="glass-shine card-soft p-4 sm:p-5">
-              <h2 className="text-base font-semibold">{t("analyze.errorsByReason")}</h2>
+              <h2 className="text-base font-semibold lg:text-lg">{t("analyze.errorsByReason")}</h2>
               <ul className="mt-3 space-y-2 text-sm">
                 {summary.error_breakdown.map((row) => (
                   <li key={row.reason} className="flex justify-between gap-3 border-b border-[var(--glass-border)] pb-2 last:border-0">

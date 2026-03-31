@@ -1,6 +1,12 @@
 export const ru = {
   "nav.home": "Главная",
   "nav.analyze": "Анализ",
+  "nav.openMenu": "Открыть меню",
+  "nav.closeMenu": "Закрыть меню",
+  "nav.themeLabel": "Тема",
+  "nav.languageLabel": "Язык",
+  "nav.themeLight": "Светлая",
+  "nav.themeDark": "Тёмная",
   "footer.about": "Извлекайте требования рынка из вакансий HH и работайте с чистым Excel-отчетом.",
   "footer.navigation": "Навигация",
   "footer.contacts": "Контакты",

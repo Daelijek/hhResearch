@@ -269,14 +269,14 @@ export function ExportForm({
       )}
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
-        <legend className="mb-2 inline-flex items-center text-sm font-medium text-[var(--muted)]">
+        <legend className="mb-2 inline-flex items-center text-sm font-medium text-[var(--muted)] lg:text-base">
           {t("form.modeLegend")}
           <TooltipIcon
             text={mode === "manual" ? t("form.modeHelpManual") : t("form.modeHelpAuto")}
             alt={t("form.tooltipAlt")}
           />
         </legend>
-        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
+        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm lg:p-3.5 lg:text-base">
           <input
             type="radio"
             checked={mode === "manual"}
@@ -285,7 +285,7 @@ export function ExportForm({
           />
           {t("form.modeManual")}
         </label>
-        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm">
+        <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm lg:p-3.5 lg:text-base">
           <input
             type="radio"
             checked={mode === "auto"}
@@ -306,7 +306,7 @@ export function ExportForm({
             value={manualLines}
             onChange={(e) => setManualLines(e.target.value)}
             placeholder="131474430&#10;https://hh.ru/vacancy/131234053"
-            className="input-ui min-h-40 font-mono text-sm"
+            className="input-ui min-h-40 text-sm tabular-nums lg:text-base"
             spellCheck={false}
           />
         </label>
@@ -320,7 +320,7 @@ export function ExportForm({
             <textarea
               value={queriesText}
               onChange={(e) => setQueriesText(e.target.value)}
-              className="input-ui min-h-28"
+              className="input-ui min-h-28 text-sm lg:text-base"
               spellCheck={false}
             />
           </label>
@@ -478,7 +478,7 @@ export function ExportForm({
       <button
         type="button"
         disabled={busy}
-        className="btn-primary w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        className="btn-primary w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto lg:px-6 lg:py-3.5 lg:text-base"
         onClick={() => void doExport()}
       >
         {busy ? t("form.btnBusy") : t("form.btnReady")}

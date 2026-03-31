@@ -38,22 +38,22 @@ export default function Home() {
           <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="anim-fade-up">
               <p className="badge">{t("landing.badge")}</p>
-              <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-[var(--text)] md:text-6xl">
+              <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-[var(--text)] sm:text-5xl md:text-6xl lg:text-[3.35rem] lg:leading-[1.08]">
                 {t("landing.title")}
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-7 text-[var(--muted)] md:text-lg">
+              <p className="mt-5 max-w-xl text-base leading-7 text-[var(--muted)] md:text-lg lg:max-w-2xl lg:text-xl lg:leading-8">
                 {t("landing.subtitle")}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href="/analyze"
-                  className="btn-primary px-5 py-3 text-sm font-semibold"
+                  className="btn-primary px-5 py-3 text-sm font-semibold lg:px-6 lg:py-3.5 lg:text-base"
                 >
                   {t("landing.ctaStart")}
                 </Link>
                 <a
                   href="#how"
-                  className="btn-soft px-5 py-3 text-sm font-semibold text-[var(--text)]"
+                  className="btn-soft px-5 py-3 text-sm font-semibold text-[var(--text)] lg:px-6 lg:py-3.5 lg:text-base"
                 >
                   {t("landing.ctaHow")}
                 </a>
@@ -74,7 +74,7 @@ export default function Home() {
               shine
               leading={
                 <div
-                  className="text-2xl font-semibold text-[var(--primary)] tabular-nums"
+                  className="text-2xl font-semibold text-[var(--primary)] tabular-nums lg:text-3xl"
                   aria-hidden
                 >
                   {num}
@@ -95,7 +95,7 @@ export default function Home() {
             <LandingGlassCard
               key={item.title}
               leading={
-                <div className="text-2xl font-semibold text-[var(--primary)]" aria-hidden>
+                <div className="text-2xl font-semibold text-[var(--primary)] lg:text-3xl" aria-hidden>
                   {item.num}
                 </div>
               }
@@ -119,7 +119,7 @@ export default function Home() {
             <LandingGlassCard
               key={step}
               leading={
-                <p className="text-sm font-semibold text-[var(--primary)]">
+                <p className="text-sm font-semibold text-[var(--primary)] lg:text-base">
                   {t("landing.stepBadge", { n: step })}
                 </p>
               }
@@ -139,7 +139,10 @@ export default function Home() {
             ))}
           </div>
           <div className="mt-8">
-            <Link href="/analyze" className="btn-primary px-5 py-3 text-sm font-semibold">
+            <Link
+              href="/analyze"
+              className="btn-primary px-5 py-3 text-sm font-semibold lg:px-6 lg:py-3.5 lg:text-base"
+            >
               {t("landing.faqCta")}
             </Link>
           </div>

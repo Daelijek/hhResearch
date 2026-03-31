@@ -78,11 +78,152 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
   color: var(--text);
+  transition: background 450ms ease, color 300ms ease;
   background:
     radial-gradient(1200px 650px at 3% -12%, var(--grad-a), transparent),
     radial-gradient(1000px 600px at 97% -18%, var(--grad-b), transparent),
     var(--bg);
+}
+
+/* Theme toggle: glass switch with both icons and smooth knob motion */
+.hh-theme-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 56px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-sat));
+  cursor: pointer;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+[data-theme="dark"] .hh-theme-switch {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+}
+
+/* Desktop toolbar: make toggle match header nav height */
+.hh-theme-switch--toolbar {
+  height: 44px;
+  width: 85px;
+  padding: 0 8px;
+}
+
+.hh-theme-switch--toolbar .hh-theme-switch__icon {
+  font-size: 16px;
+}
+
+.hh-theme-switch--toolbar .hh-theme-switch__knob {
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc(50% - 6px);
+}
+
+.hh-theme-switch:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(127, 154, 255, 0.25),
+    var(--glass-shadow-soft);
+}
+
+.hh-theme-switch__icon {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50%;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.55;
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hh-theme-switch__icon--sun {
+  transform: translateX(-1px);
+}
+
+.hh-theme-switch__icon--moon {
+  transform: translateX(1px);
+}
+
+.hh-theme-switch__knob {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  z-index: 1;
+  /* Светлая тема: нужен контрастный (темный) "кружок" */
+  background:
+    radial-gradient(70px 28px at 30% 0%, rgba(25, 39, 86, 0.85), transparent 60%),
+    linear-gradient(180deg, rgba(25, 39, 86, 0.55), rgba(25, 39, 86, 0.22));
+  box-shadow: 0 14px 30px rgba(13, 31, 63, 0.18);
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateX(0);
+}
+
+.hh-theme-switch.is-dark .hh-theme-switch__knob {
+  transform: translateX(100%);
+  /* Тёмная тема: оставляем кружок светлым */
+  background:
+    radial-gradient(70px 28px at 30% 0%, rgba(255, 255, 255, 0.92), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+}
+
+.hh-theme-switch.is-light .hh-theme-switch__icon--sun {
+  opacity: 1;
+}
+
+.hh-theme-switch.is-dark .hh-theme-switch__icon--moon {
+  opacity: 1;
+}
+
+.hh-theme-switch--drawer {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+}
+
+.hh-theme-switch--drawer .hh-theme-switch__icon {
+  font-size: 16px;
+}
+
+.hh-theme-switch--drawer .hh-theme-switch__knob {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hh-theme-switch__knob {
+    transition: none;
+  }
+  .hh-theme-switch__icon {
+    transition: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
 }
 
 /* Reusable liquid glass surfaces */
@@ -208,6 +349,28 @@ a {
   text-decoration: none;
 }
 
+.hh-mobile-nav-panel {
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-sat));
+}
+
+.hh-mobile-nav-panel::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(720px 240px at 15% 0%, var(--glass-highlight), transparent 62%),
+    radial-gradient(640px 260px at 85% 10%, color-mix(in srgb, var(--ring), transparent 78%), transparent 60%),
+    radial-gradient(900px 420px at 50% 110%, rgba(165, 140, 255, 0.08), transparent 60%);
+  opacity: 0.75;
+}
+
+.hh-mobile-nav-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
 .container-shell {
   box-sizing: border-box;
   margin-inline: auto;
@@ -226,14 +389,21 @@ a {
 
 @media (min-width: 1024px) {
   .container-shell {
+    max-width: 1280px;
     padding-left: max(2rem, env(safe-area-inset-left, 0px));
     padding-right: max(2rem, env(safe-area-inset-right, 0px));
   }
 }
 
+@media (min-width: 1280px) {
+  .container-shell {
+    max-width: 1360px;
+  }
+}
+
 .section-title {
   margin: 0;
-  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+  font-size: clamp(1.5rem, 1.05rem + 1.65vw, 2.625rem);
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
@@ -243,6 +413,19 @@ a {
   color: var(--muted);
   font-size: 1rem;
   line-height: 1.6;
+}
+
+@media (min-width: 1024px) {
+  .section-subtitle {
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+}
+
+@media (min-width: 1280px) {
+  .section-subtitle {
+    font-size: 1.125rem;
+  }
 }
 
 .card-soft {
@@ -336,6 +519,96 @@ a {
   }
 }
 
+/* Landing cards: soft hero wash (opacity fade) + bottom accent along card curve */
+.landing-glass-card.card-soft > .landing-glass-card__wash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(620px 360px at 15% 0%, color-mix(in srgb, var(--grad-a), transparent 58%), transparent 64%),
+    radial-gradient(560px 320px at 88% 8%, color-mix(in srgb, var(--grad-b), transparent 58%), transparent 60%),
+    radial-gradient(720px 400px at 50% 100%, rgba(165, 140, 255, 0.09), transparent 62%);
+  opacity: 0;
+  transition: opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] .landing-glass-card.card-soft > .landing-glass-card__wash {
+  background:
+    radial-gradient(620px 360px at 15% 0%, color-mix(in srgb, var(--grad-a), transparent 52%), transparent 62%),
+    radial-gradient(560px 320px at 88% 8%, color-mix(in srgb, var(--grad-b), transparent 52%), transparent 60%),
+    radial-gradient(720px 400px at 50% 100%, rgba(165, 140, 255, 0.07), transparent 62%);
+}
+
+.landing-glass-card:hover > .landing-glass-card__wash {
+  opacity: 1;
+}
+
+.landing-glass-card.card-soft > .landing-glass-card__body {
+  position: relative;
+  z-index: 2;
+}
+
+/* Subtle ::before on hover only for shine cards — keep weak so wash stays primary */
+.landing-glass-card.card-soft.glass-shine:hover::before {
+  opacity: 0.82;
+  filter: saturate(1.04);
+}
+
+[data-theme="dark"] .landing-glass-card.card-soft.glass-shine:hover::before {
+  opacity: 0.68;
+  filter: saturate(1.08);
+}
+
+.landing-glass-card.card-soft > .landing-glass-card__shine-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 0 1.25rem 1.25rem;
+  pointer-events: none;
+  z-index: 3;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary), transparent 78%) 12%,
+    color-mix(in srgb, var(--primary), transparent 22%) 46%,
+    color-mix(in srgb, var(--ring), transparent 28%) 54%,
+    color-mix(in srgb, var(--primary), transparent 22%) 68%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--primary), transparent 72%);
+}
+
+.landing-glass-card:hover > .landing-glass-card__shine-line {
+  opacity: 0.92;
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-glass-card.card-soft > .landing-glass-card__wash {
+    transition: opacity 0.22s ease;
+  }
+
+  .landing-glass-card.card-soft > .landing-glass-card__shine-line {
+    transition: opacity 0.2s ease;
+  }
+
+  .landing-glass-card:hover > .landing-glass-card__shine-line {
+    transform: scaleX(1);
+  }
+}
+
 [data-theme="dark"] .surface-glass,
 [data-theme="dark"] .surface-glass-sm,
 [data-theme="dark"] .bar-glass {
@@ -357,6 +630,12 @@ a {
   color: var(--muted);
 }
 
+@media (min-width: 1024px) {
+  .form-label {
+    font-size: 0.9375rem;
+  }
+}
+
 [data-theme="dark"] .form-label {
   color: color-mix(in srgb, var(--muted), var(--text) 25%);
 }
@@ -372,8 +651,16 @@ a {
   color: var(--text);
   border-radius: 0.75rem;
   padding: 0.7rem 0.85rem;
+  font-size: 0.9375rem;
   outline: none;
   transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+@media (min-width: 1024px) {
+  .input-ui {
+    padding: 0.75rem 0.95rem;
+    font-size: 1rem;
+  }
 }
 
 .input-ui::placeholder {
@@ -484,6 +771,13 @@ a {
   font-weight: 600;
   background: var(--surface-soft);
   color: #2f4fa4;
+}
+
+@media (min-width: 1024px) {
+  .badge {
+    font-size: 0.8125rem;
+    padding: 0.3rem 0.75rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
