@@ -41,7 +41,15 @@ def _parse_cors_origins() -> list[str]:
 def _cors_origin_regex() -> Optional[str]:
     """Optional regex for origins not listed in CORS_ORIGINS (e.g. all *.vercel.app previews)."""
     raw = os.environ.get("CORS_ORIGIN_REGEX", "").strip()
-    return raw or None
+    if raw:
+        return raw
+
+    # Dev convenience: allow localhost/127.0.0.1 on any port.
+    # Enable explicitly to avoid widening CORS in production.
+    if os.environ.get("DEV_CORS_ANY_LOCALHOST", "").strip() in ("1", "true", "True", "yes", "YES"):
+        return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+    return None
 
 
 def _effective_token(body_token: Optional[str]) -> Optional[str]:

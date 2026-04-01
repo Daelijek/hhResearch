@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExportSummary } from "@/lib/export-history";
 import { useI18n } from "@/lib/i18n";
 import { SummaryView } from "@/components/summary/summary-view";
 import { Sparkline } from "@/components/summary/sparkline";
 import { DiffTable } from "@/components/summary/compare/diff-table";
+import { LongRunningProgress } from "@/components/ui/long-running-progress";
 
 type ExperienceItem = { id: string; name: string };
 type EmployerItem = { id: string; name: string; open_vacancies?: number };
@@ -49,8 +50,8 @@ export default function SummaryPage() {
   const [viewMode, setViewMode] = useState<"aggregate" | "byQuery" | "compareSegments" | "comparePeriod">("aggregate");
 
   const [queriesText, setQueriesText] = useState("frontend developer\nfullstack developer");
-  const [pages, setPages] = useState(2);
-  const [perPage, setPerPage] = useState(100);
+  const [pages, setPages] = useState<number | "">(1);
+  const [perPage, setPerPage] = useState<number | "">(10);
   const [kwTopN, setKwTopN] = useState(30);
   const [kwMaxNgram, setKwMaxNgram] = useState(3);
   const [sleepS, setSleepS] = useState(0.2);
@@ -76,9 +77,12 @@ export default function SummaryPage() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ExportSummary | null>(null);
   const [byQuery, setByQuery] = useState<Array<{ query: string; summary: ExportSummary }>>([]);
+  const [byQueryDone, setByQueryDone] = useState(0);
+  const [byQueryTotal, setByQueryTotal] = useState(0);
   const [compareA, setCompareA] = useState<ExportSummary | null>(null);
   const [compareB, setCompareB] = useState<ExportSummary | null>(null);
   const [comparePeriod, setComparePeriod] = useState<Array<{ period: number; summary: ExportSummary }>>([]);
+  const byQueryAbortRef = useRef<AbortController | null>(null);
 
   // Segment B filter state (A uses the existing area/experience/employer)
   const [experienceIdB, setExperienceIdB] = useState<string>("");
@@ -192,7 +196,7 @@ export default function SummaryPage() {
     return areaOptions.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 12);
   }, [areaOptions, areaQuery]);
 
-  async function fetchSummary(payload: Record<string, unknown>): Promise<ExportSummary> {
+  async function fetchSummary(payload: Record<string, unknown>, signal?: AbortSignal): Promise<ExportSummary> {
     if (!baseUrl) throw new Error(t("form.errNoUrl"));
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
@@ -201,6 +205,7 @@ export default function SummaryPage() {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
+      signal,
     });
     if (!resp.ok) {
       const text = await resp.text();
@@ -253,6 +258,8 @@ export default function SummaryPage() {
     setError(null);
     setSummary(null);
     setByQuery([]);
+    setByQueryDone(0);
+    setByQueryTotal(0);
     setCompareA(null);
     setCompareB(null);
     setComparePeriod([]);
@@ -260,6 +267,14 @@ export default function SummaryPage() {
     const queries = linesFromTextarea(queriesText);
     if (queries.length === 0) {
       setError(t("form.errNoAuto"));
+      return;
+    }
+    if (pages === "" || pages <= 0) {
+      setError(t("form.errPagesRequired"));
+      return;
+    }
+    if (perPage === "" || perPage <= 0) {
+      setError(t("form.errPerPageRequired"));
       return;
     }
 
@@ -280,6 +295,8 @@ export default function SummaryPage() {
     setError(null);
     setSummary(null);
     setByQuery([]);
+    setByQueryDone(0);
+    setByQueryTotal(0);
     setCompareA(null);
     setCompareB(null);
     setComparePeriod([]);
@@ -289,10 +306,21 @@ export default function SummaryPage() {
       setError(t("form.errNoAuto"));
       return;
     }
+    if (pages === "" || pages <= 0) {
+      setError(t("form.errPagesRequired"));
+      return;
+    }
+    if (perPage === "" || perPage <= 0) {
+      setError(t("form.errPerPageRequired"));
+      return;
+    }
 
     const seg = { employer_id: employerId, experience: experienceId, area: areaId };
 
     setBusy(true);
+    const ac = new AbortController();
+    byQueryAbortRef.current = ac;
+    setByQueryTotal(queries.length);
     try {
       // Concurrency limit: 3
       const limit = 3;
@@ -300,19 +328,31 @@ export default function SummaryPage() {
       let i = 0;
       async function worker() {
         while (i < queries.length) {
+          if (ac.signal.aborted) return;
           const idx = i++;
           const q = queries[idx];
-          const s = await fetchSummary(payloadForSegment([q], seg));
+          const s = await fetchSummary(payloadForSegment([q], seg), ac.signal);
           results.push({ query: q, summary: s });
           setByQuery([...results].sort((a, b) => a.query.localeCompare(b.query)));
+          setByQueryDone(results.length);
         }
       }
       await Promise.all(Array.from({ length: Math.min(limit, queries.length) }, () => worker()));
       setByQuery(results);
     } catch (e) {
+      const isAbort =
+        (e instanceof DOMException && e.name === "AbortError") || (e instanceof Error && e.name === "AbortError");
+      if (isAbort) {
+        setError(null);
+        setByQuery([]);
+        setByQueryDone(0);
+        setByQueryTotal(0);
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      byQueryAbortRef.current = null;
     }
   }
 
@@ -327,6 +367,14 @@ export default function SummaryPage() {
     const queries = linesFromTextarea(queriesText);
     if (queries.length === 0) {
       setError(t("form.errNoAuto"));
+      return;
+    }
+    if (pages === "" || pages <= 0) {
+      setError(t("form.errPagesRequired"));
+      return;
+    }
+    if (perPage === "" || perPage <= 0) {
+      setError(t("form.errPerPageRequired"));
       return;
     }
 
@@ -359,6 +407,14 @@ export default function SummaryPage() {
     const queries = linesFromTextarea(queriesText);
     if (queries.length === 0) {
       setError(t("form.errNoAuto"));
+      return;
+    }
+    if (pages === "" || pages <= 0) {
+      setError(t("form.errPagesRequired"));
+      return;
+    }
+    if (perPage === "" || perPage <= 0) {
+      setError(t("form.errPerPageRequired"));
       return;
     }
 
@@ -463,7 +519,7 @@ export default function SummaryPage() {
                   min={1}
                   max={20}
                   value={pages}
-                  onChange={(e) => setPages(Number(e.target.value))}
+                  onChange={(e) => setPages(e.target.value === "" ? "" : Number(e.target.value))}
                   className="input-ui"
                 />
               </label>
@@ -474,7 +530,7 @@ export default function SummaryPage() {
                   min={1}
                   max={100}
                   value={perPage}
-                  onChange={(e) => setPerPage(Number(e.target.value))}
+                  onChange={(e) => setPerPage(e.target.value === "" ? "" : Number(e.target.value))}
                   className="input-ui"
                 />
               </label>
@@ -724,6 +780,16 @@ export default function SummaryPage() {
             >
               {busy ? t("summary.btnBusy") : t("summary.btnReady")}
             </button>
+
+            <LongRunningProgress
+              visible={busy && viewMode === "byQuery"}
+              variant="determinate"
+              label={t("summary.byQuery.progress", { done: String(byQueryDone), total: String(byQueryTotal) })}
+              done={byQueryDone}
+              total={byQueryTotal}
+              cancelLabel={t("form.btnCancel")}
+              onCancel={() => byQueryAbortRef.current?.abort()}
+            />
           </div>
         </article>
 

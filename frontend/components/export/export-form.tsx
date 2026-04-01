@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { TooltipIcon } from "@/components/ui/tooltip-icon";
+import { LongRunningProgress } from "@/components/ui/long-running-progress";
 import {
   mergeExportPreset,
   pushExportHistory,
@@ -71,8 +72,8 @@ export function ExportForm({
   const [mode, setMode] = useState<"manual" | "auto">(seed.mode);
   const [manualLines, setManualLines] = useState(seed.manualLines);
   const [queriesText, setQueriesText] = useState(seed.queriesText);
-  const [pages, setPages] = useState(seed.pages);
-  const [perPage, setPerPage] = useState(seed.perPage);
+  const [pages, setPages] = useState<number | "">(seed.pages);
+  const [perPage, setPerPage] = useState<number | "">(seed.perPage);
   const [kwTopN, setKwTopN] = useState(seed.kwTopN);
   const [kwMaxNgram, setKwMaxNgram] = useState(seed.kwMaxNgram);
   const [sleepS, setSleepS] = useState(seed.sleepS);
@@ -84,11 +85,31 @@ export function ExportForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statsStatus, setStatsStatus] = useState<"idle" | "ok" | "missing" | "bad">("idle");
+  const abortRef = useRef<AbortController | null>(null);
+  const pollAbortRef = useRef<AbortController | null>(null);
+  const [jobProgress, setJobProgress] = useState<{ done: number; total: number } | null>(null);
+
+  function stopAllRequests() {
+    abortRef.current?.abort();
+    pollAbortRef.current?.abort();
+  }
+
+  type JobStatus = {
+    job_id: string;
+    status: string;
+    kind?: string | null;
+    progress_done?: number | null;
+    progress_total?: number | null;
+    warnings_count?: number | null;
+    summary?: ExportSummary | null;
+    download_url?: string | null;
+  };
 
   async function doExport() {
     setError(null);
     setMessage(null);
     setStatsStatus("idle");
+    setJobProgress(null);
 
     if (!baseUrl) {
       setError(t("form.errNoUrl"));
@@ -98,7 +119,7 @@ export function ExportForm({
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
 
-    let url = `${baseUrl}/api/v1/export/manual`;
+    let url = `${baseUrl}/api/v1/export/manual/async`;
     let body: Record<string, unknown>;
 
     if (mode === "manual") {
@@ -115,10 +136,18 @@ export function ExportForm({
         ...(hhToken.trim() ? { token: hhToken.trim() } : {}),
       };
     } else {
-      url = `${baseUrl}/api/v1/export/auto`;
+      url = `${baseUrl}/api/v1/export/auto/async`;
       const queries = linesFromTextarea(queriesText);
       if (queries.length === 0) {
         setError(t("form.errNoAuto"));
+        return;
+      }
+      if (pages === "" || pages <= 0) {
+        setError(t("form.errPagesRequired"));
+        return;
+      }
+      if (perPage === "" || perPage <= 0) {
+        setError(t("form.errPerPageRequired"));
         return;
       }
       body = {
@@ -134,22 +163,25 @@ export function ExportForm({
     }
 
     setBusy(true);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const pollAc = new AbortController();
+    pollAbortRef.current = pollAc;
     try {
-      const response = await fetch(url, {
+      const startResp = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        signal: ac.signal,
       });
 
-      const warnings = response.headers.get("X-Export-Warnings");
-      const summaryHeader = response.headers.get("X-Export-Summary");
-      if (!response.ok) {
-        const text = await response.text();
+      if (!startResp.ok) {
+        const text = await startResp.text();
         const apiErr = parseApiErrorText(text);
 
         const code = apiErr.code;
         const vars = apiErr.vars ?? {};
-        const messageFallback = apiErr.message || response.statusText || "Unknown error";
+        const messageFallback = apiErr.message || startResp.statusText || t("form.errUnknown");
 
         if (code === "too_many_vacancies") {
           const search_countVal = vars["search_count"];
@@ -184,26 +216,70 @@ export function ExportForm({
         return;
       }
 
-      let parsedSummary: ExportSummary | null = null;
+      const started = (await startResp.json()) as any;
+      const jobId = typeof started?.job_id === "string" ? started.job_id : "";
+      if (!jobId) {
+        setError(t("form.errBadJob"));
+        return;
+      }
+
+      setMessage(t("form.jobStarted"));
+
+      let last: JobStatus | null = null;
+      for (let attempt = 0; attempt < 10_000; attempt++) {
+        if (pollAc.signal.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+        const stResp = await fetch(`${baseUrl}/api/v1/jobs/${jobId}`, {
+          method: "GET",
+          headers: apiKey.trim() ? { "X-API-Key": apiKey.trim() } : undefined,
+          signal: pollAc.signal,
+        });
+        if (!stResp.ok) {
+          throw new Error(t("form.errJobStatus"));
+        }
+        const st = (await stResp.json()) as JobStatus;
+        last = st;
+
+        const done = typeof st.progress_done === "number" ? st.progress_done : 0;
+        const total = typeof st.progress_total === "number" ? st.progress_total : 0;
+        if (total > 0) setJobProgress({ done, total });
+
+        if (st.status === "succeeded") break;
+        if (st.status === "failed") {
+          throw new Error(t("form.errJobFailed"));
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      const parsedSummary = last?.summary ?? null;
       if (onSummary) {
-        try {
-          if (summaryHeader) {
-            const jsonText = decodeBase64UrlUtf8(summaryHeader);
-            parsedSummary = JSON.parse(jsonText) as ExportSummary;
-            onSummary(parsedSummary);
-            setStatsStatus("ok");
-          } else {
-            onSummary(null);
-            setStatsStatus("missing");
-          }
-        } catch {
+        if (parsedSummary) {
+          onSummary(parsedSummary);
+          setStatsStatus("ok");
+        } else {
           onSummary(null);
-          setStatsStatus(summaryHeader ? "bad" : "missing");
+          setStatsStatus("missing");
         }
       }
 
-      const blob = await response.blob();
-      const fileName = filenameFromContentDisposition(response.headers.get("Content-Disposition"));
+      const downloadPath = last?.download_url;
+      if (!downloadPath) {
+        setError(t("form.errJobNoDownload"));
+        return;
+      }
+      const downloadUrl = `${baseUrl}${downloadPath}`;
+
+      const fileResp = await fetch(downloadUrl, {
+        method: "GET",
+        headers: apiKey.trim() ? { "X-API-Key": apiKey.trim() } : undefined,
+        signal: ac.signal,
+      });
+      if (!fileResp.ok) {
+        throw new Error(t("form.errDownload"));
+      }
+      const blob = await fileResp.blob();
+      const fileName = filenameFromContentDisposition(fileResp.headers.get("Content-Disposition"));
       const href = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = href;
@@ -214,7 +290,7 @@ export function ExportForm({
       if (parsedSummary) {
         pushExportHistory({
           mode,
-          warnings: warnings ? Number(warnings) : null,
+          warnings: typeof last?.warnings_count === "number" ? last.warnings_count : null,
           fileName,
           summary: {
             requested: parsedSummary.requested,
@@ -237,14 +313,23 @@ export function ExportForm({
       }
 
       setMessage(
-        warnings
-          ? t("form.successWarn", { n: warnings })
+        typeof last?.warnings_count === "number" && last.warnings_count > 0
+          ? t("form.successWarn", { n: String(last.warnings_count) })
           : t("form.success")
       );
     } catch (caughtError) {
+      const isAbort =
+        (caughtError instanceof DOMException && caughtError.name === "AbortError") ||
+        (caughtError instanceof Error && caughtError.name === "AbortError");
+      if (isAbort) {
+        setMessage(t("form.exportAborted"));
+        return;
+      }
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
     } finally {
       setBusy(false);
+      abortRef.current = null;
+      pollAbortRef.current = null;
     }
   }
 
@@ -335,7 +420,7 @@ export function ExportForm({
                 min={1}
                 max={20}
                 value={pages}
-                onChange={(e) => setPages(Number(e.target.value))}
+                onChange={(e) => setPages(e.target.value === "" ? "" : Number(e.target.value))}
                 className="input-ui"
               />
             </label>
@@ -349,7 +434,7 @@ export function ExportForm({
                 min={1}
                 max={100}
                 value={perPage}
-                onChange={(e) => setPerPage(Number(e.target.value))}
+                onChange={(e) => setPerPage(e.target.value === "" ? "" : Number(e.target.value))}
                 className="input-ui"
               />
             </label>
@@ -357,97 +442,99 @@ export function ExportForm({
         </section>
       )}
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <label className="form-field">
-          <span className="form-label inline-flex items-center">
-            {t("form.kwTopN")}
-            <TooltipIcon text={t("form.kwTopNHelp")} alt={t("form.tooltipAlt")} />
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={200}
-            value={kwTopN}
-            onChange={(e) => setKwTopN(Number(e.target.value))}
-            className="input-ui"
-          />
-        </label>
-        <label className="form-field">
-          <span className="form-label inline-flex items-center">
-            {t("form.kwMaxNgram")}
-            <TooltipIcon text={t("form.kwMaxNgramHelp")} alt={t("form.tooltipAlt")} />
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={5}
-            value={kwMaxNgram}
-            onChange={(e) => setKwMaxNgram(Number(e.target.value))}
-            className="input-ui"
-          />
-        </label>
-        <label className="form-field">
-          <span className="form-label inline-flex items-center">
-            {t("form.sleep")}
-            <TooltipIcon text={t("form.sleepHelp")} alt={t("form.tooltipAlt")} />
-          </span>
-          <input
-            type="number"
-            min={0}
-            max={5}
-            step={0.05}
-            value={sleepS}
-            onChange={(e) => setSleepS(Number(e.target.value))}
-            className="input-ui"
-          />
-        </label>
-        {mode === "auto" && (
+      <details className="surface-glass-sm rounded-xl p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">
+          {t("summary.advanced")}
+        </summary>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="form-field">
             <span className="form-label inline-flex items-center">
-              {t("form.searchSleep")}
-              <TooltipIcon text={t("form.searchSleepHelp")} alt={t("form.tooltipAlt")} />
+              {t("form.kwTopN")}
+              <TooltipIcon text={t("form.kwTopNHelp")} alt={t("form.tooltipAlt")} />
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={kwTopN}
+              onChange={(e) => setKwTopN(Number(e.target.value))}
+              className="input-ui"
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label inline-flex items-center">
+              {t("form.kwMaxNgram")}
+              <TooltipIcon text={t("form.kwMaxNgramHelp")} alt={t("form.tooltipAlt")} />
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={kwMaxNgram}
+              onChange={(e) => setKwMaxNgram(Number(e.target.value))}
+              className="input-ui"
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label inline-flex items-center">
+              {t("form.sleep")}
+              <TooltipIcon text={t("form.sleepHelp")} alt={t("form.tooltipAlt")} />
             </span>
             <input
               type="number"
               min={0}
               max={5}
               step={0.05}
-              value={searchSleepS}
-              onChange={(e) => setSearchSleepS(Number(e.target.value))}
+              value={sleepS}
+              onChange={(e) => setSleepS(Number(e.target.value))}
               className="input-ui"
             />
           </label>
-        )}
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <label className="form-field">
-          <span className="form-label inline-flex items-center">
-            {t("form.hhToken")}
-            <TooltipIcon text={t("form.hhTokenHelp")} alt={t("form.tooltipAlt")} />
-          </span>
-          <input
-            type="password"
-            value={hhToken}
-            onChange={(e) => setHhToken(e.target.value)}
-            className="input-ui"
-            autoComplete="off"
-          />
-        </label>
-        <label className="form-field">
-          <span className="form-label inline-flex items-center">
-            {t("form.apiKey")}
-            <TooltipIcon text={t("form.apiKeyHelp")} alt={t("form.tooltipAlt")} />
-          </span>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="input-ui"
-            autoComplete="off"
-          />
-        </label>
-      </section>
+          {mode === "auto" && (
+            <label className="form-field">
+              <span className="form-label inline-flex items-center">
+                {t("form.searchSleep")}
+                <TooltipIcon text={t("form.searchSleepHelp")} alt={t("form.tooltipAlt")} />
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.05}
+                value={searchSleepS}
+                onChange={(e) => setSearchSleepS(Number(e.target.value))}
+                className="input-ui"
+              />
+            </label>
+          )}
+          <label className="form-field">
+            <span className="form-label inline-flex items-center">
+              {t("form.hhToken")}
+              <TooltipIcon text={t("form.hhTokenHelp")} alt={t("form.tooltipAlt")} />
+            </span>
+            <input
+              type="password"
+              value={hhToken}
+              onChange={(e) => setHhToken(e.target.value)}
+              className="input-ui"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label inline-flex items-center">
+              {t("form.apiKey")}
+              <TooltipIcon text={t("form.apiKeyHelp")} alt={t("form.tooltipAlt")} />
+            </span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="input-ui"
+              autoComplete="off"
+            />
+          </label>
+        </div>
+      </details>
 
       {error && (
         <p
@@ -483,6 +570,23 @@ export function ExportForm({
       >
         {busy ? t("form.btnBusy") : t("form.btnReady")}
       </button>
+
+      <LongRunningProgress
+        visible={busy}
+        variant={jobProgress ? "determinate" : "indeterminate"}
+        label={
+          jobProgress
+            ? t("form.progressExportPct", {
+                done: String(jobProgress.done),
+                total: String(jobProgress.total),
+              })
+            : t("form.progressExport")
+        }
+        done={jobProgress?.done}
+        total={jobProgress?.total}
+        cancelLabel={t("form.btnCancel")}
+        onCancel={() => stopAllRequests()}
+      />
 
       {statsStatus !== "idle" && (
         <p className="text-xs text-[var(--muted)]">
