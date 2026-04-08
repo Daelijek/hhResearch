@@ -35,13 +35,13 @@ export default function Home() {
     <>
       <section className="hero-glow py-12 sm:py-16 md:py-24">
         <div className="container-shell">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="grid items-center gap-10">
             <div className="anim-fade-up">
               <p className="badge">{t("landing.badge")}</p>
               <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-[var(--text)] sm:text-5xl md:text-6xl lg:text-[3.35rem] lg:leading-[1.08]">
                 {t("landing.title")}
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-7 text-[var(--muted)] md:text-lg lg:max-w-2xl lg:text-xl lg:leading-8">
+              <p className="mt-5 text-base leading-7 text-[var(--muted)] md:text-lg lg:text-xl lg:leading-8">
                 {t("landing.subtitle")}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -59,6 +59,39 @@ export default function Home() {
                 </a>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" className="container-shell py-12 md:py-16">
+        <h2 className="section-title">{t("landing.howTitle")}</h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {(
+            [
+              ["1", t("landing.step1Title"), t("landing.step1Text")],
+              ["2", t("landing.step2Title"), t("landing.step2Text")],
+              ["3", t("landing.step3Title"), t("landing.step3Text")],
+            ] as const
+          ).map(([step, title, text]) => (
+            <LandingGlassCard
+              key={step}
+              leading={
+                <p className="text-sm font-semibold text-[var(--primary)] lg:text-base">
+                  {t("landing.stepBadge", { n: step })}
+                </p>
+              }
+              title={title}
+              description={text}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="container-shell py-12 md:py-16">
+        <div className="anim-fade-up">
+          <h2 className="section-title">{t("landing.previewTitle")}</h2>
+          <p className="section-subtitle">{t("landing.previewSubtitle")}</p>
+          <div className="mt-8">
             <LandingExcelPreview t={t} />
           </div>
         </div>
@@ -106,30 +139,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="how" className="container-shell py-12 md:py-16">
-        <h2 className="section-title">{t("landing.howTitle")}</h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {(
-            [
-              ["1", t("landing.step1Title"), t("landing.step1Text")],
-              ["2", t("landing.step2Title"), t("landing.step2Text")],
-              ["3", t("landing.step3Title"), t("landing.step3Text")],
-            ] as const
-          ).map(([step, title, text]) => (
-            <LandingGlassCard
-              key={step}
-              leading={
-                <p className="text-sm font-semibold text-[var(--primary)] lg:text-base">
-                  {t("landing.stepBadge", { n: step })}
-                </p>
-              }
-              title={title}
-              description={text}
-            />
-          ))}
-        </div>
-      </section>
-
       <section className="container-shell py-10 md:py-16">
         <div className="card-soft faq-no-lift px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
           <h2 className="section-title">{t("landing.faqTitle")}</h2>
@@ -137,14 +146,6 @@ export default function Home() {
             {FAQ_KEYS.map(([qKey, aKey]) => (
               <FaqDisclosure key={qKey} question={t(qKey)} answer={t(aKey)} />
             ))}
-          </div>
-          <div className="mt-8">
-            <Link
-              href="/analyze"
-              className="btn-primary px-5 py-3 text-sm font-semibold lg:px-6 lg:py-3.5 lg:text-base"
-            >
-              {t("landing.faqCta")}
-            </Link>
           </div>
         </div>
       </section>

@@ -206,6 +206,9 @@ def run_export_on_worksheet(
     without_key_skills = 0
     without_description = 0
 
+    if on_progress and total > 0:
+        on_progress(0, total)
+
     for ref in refs:
         vid = ref.vacancy_id
         try:
@@ -249,8 +252,16 @@ def run_export_on_worksheet(
         processed += 1
         if sleep_s > 0:
             time.sleep(sleep_s)
-        if on_progress and processed % 10 == 0:
-            on_progress(processed, total)
+        if on_progress and total > 0:
+            # Smooth for small totals; throttle for large ones to avoid excessive status writes.
+            if processed == total:
+                on_progress(processed, total)
+            elif total <= 20:
+                on_progress(processed, total)
+            elif total <= 100 and processed % 5 == 0:
+                on_progress(processed, total)
+            elif processed % 10 == 0:
+                on_progress(processed, total)
 
     # Unique columns are placed right after "Link" by default.
     col_unique_keywords = col_link + 1
