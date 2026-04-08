@@ -248,6 +248,7 @@ export const kk = {
   "form.progressExportPct": "Экспорт {done} / {total}…",
   "form.exportAborted": "Пайдаланушы тоқтатты.",
   "form.jobStarted": "Басталды. Прогресс алынады…",
+  "form.summaryReady": "Қорытынды дайын.",
   "form.errBadJob": "Қате жауап: job_id жоқ.",
   "form.errJobStatus": "Тапсырма статусын оқу мүмкін емес.",
   "form.errJobFailed": "Экспорт тапсырмасы қате аяқталды.",

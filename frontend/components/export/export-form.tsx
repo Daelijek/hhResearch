@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { TooltipIcon } from "@/components/ui/tooltip-icon";
 import { LongRunningProgress } from "@/components/ui/long-running-progress";
 import {
+  defaultExportPreset,
   mergeExportPreset,
   pushExportHistory,
   type ExportFormPreset,
@@ -301,8 +302,8 @@ export function ExportForm({
             mode,
             manualLines,
             queriesText,
-            pages,
-            perPage,
+            pages: pages === "" ? defaultExportPreset().pages : pages,
+            perPage: perPage === "" ? defaultExportPreset().perPage : perPage,
             kwTopN,
             kwMaxNgram,
             sleepS,

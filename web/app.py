@@ -399,6 +399,34 @@ def summary_auto(
     return {"summary": summary}
 
 
+@app.post("/api/v1/summary/auto/async")
+def summary_auto_async(
+    body: SummaryAutoBody,
+    response: Response,
+    _: Annotated[None, Depends(_require_api_key)],
+) -> dict:
+    request_id = str(uuid4())
+    response.headers["X-Request-Id"] = request_id
+
+    token = _effective_token(body.token)
+    payload = {
+        "queries": body.queries,
+        "pages": body.pages,
+        "per_page": body.per_page,
+        "kw_top_n": body.kw_top_n,
+        "kw_max_ngram": body.kw_max_ngram,
+        "sleep_s": body.sleep_s,
+        "search_sleep_s": body.search_sleep_s,
+        "employer_id": body.employer_id,
+        "area": body.area,
+        "experience": body.experience,
+        "period": body.period,
+        "token": token,
+    }
+    job_id = enqueue_export_job("summary_auto", payload)
+    return {"job_id": job_id}
+
+
 @app.post("/api/v1/export/manual/async")
 def export_manual_async(
     body: ManualExportBody,

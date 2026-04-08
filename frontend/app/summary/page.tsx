@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ExportSummary } from "@/lib/export-history";
-import { useI18n } from "@/lib/i18n";
-import { SummaryView } from "@/components/summary/summary-view";
-import { Sparkline } from "@/components/summary/sparkline";
-import { DiffTable } from "@/components/summary/compare/diff-table";
+import { useMemo, useRef, useState } from "react";
 import { LongRunningProgress } from "@/components/ui/long-running-progress";
-
-type ExperienceItem = { id: string; name: string };
-type EmployerItem = { id: string; name: string; open_vacancies?: number };
-type AreaNode = { id: string; name: string; areas?: AreaNode[] };
+import { TooltipIcon } from "@/components/ui/tooltip-icon";
+import { SummaryView } from "@/components/summary/summary-view";
+import { defaultExportPreset, mergeExportPreset, type ExportSummary } from "@/lib/export-history";
+import { useI18n } from "@/lib/i18n";
 
 function linesFromTextarea(value: string): string[] {
   return value
@@ -35,172 +30,66 @@ function parseApiErrorText(text: string): { code?: string; message?: string; var
   }
 }
 
-function flattenAreas(nodes: AreaNode[], out: Array<{ id: string; name: string }> = []) {
-  for (const n of nodes) {
-    if (n?.id && n?.name) out.push({ id: String(n.id), name: String(n.name) });
-    if (Array.isArray(n.areas) && n.areas.length > 0) flattenAreas(n.areas, out);
-  }
-  return out;
-}
-
 export default function SummaryPage() {
   const { t } = useI18n();
   const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "", []);
+  const seed = mergeExportPreset(defaultExportPreset());
 
-  const [viewMode, setViewMode] = useState<"aggregate" | "byQuery" | "compareSegments" | "comparePeriod">("aggregate");
-
-  const [queriesText, setQueriesText] = useState("frontend developer\nfullstack developer");
-  const [pages, setPages] = useState<number | "">(1);
-  const [perPage, setPerPage] = useState<number | "">(10);
-  const [kwTopN, setKwTopN] = useState(30);
-  const [kwMaxNgram, setKwMaxNgram] = useState(3);
-  const [sleepS, setSleepS] = useState(0.2);
-  const [searchSleepS, setSearchSleepS] = useState(0.2);
-  const [periodDays, setPeriodDays] = useState<number | "">("");
+  const [viewMode, setViewMode] = useState<"aggregate" | "byQuery">("aggregate");
+  const [queriesText, setQueriesText] = useState(seed.queriesText);
+  const [pages, setPages] = useState<number | "">(seed.pages);
+  const [perPage, setPerPage] = useState<number | "">(seed.perPage);
+  const [kwTopN, setKwTopN] = useState(seed.kwTopN);
+  const [kwMaxNgram, setKwMaxNgram] = useState(seed.kwMaxNgram);
+  const [sleepS, setSleepS] = useState(seed.sleepS);
+  const [searchSleepS, setSearchSleepS] = useState(seed.searchSleepS);
   const [hhToken, setHhToken] = useState("");
   const [apiKey, setApiKey] = useState(() => process.env.NEXT_PUBLIC_API_KEY ?? "");
 
-  const [experienceId, setExperienceId] = useState<string>("");
-  const [experienceOptions, setExperienceOptions] = useState<ExperienceItem[]>([]);
-
-  const [areaQuery, setAreaQuery] = useState("");
-  const [areaId, setAreaId] = useState<string>("");
-  const [areaOptions, setAreaOptions] = useState<Array<{ id: string; name: string }>>([]);
-  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
-
-  const [companyQuery, setCompanyQuery] = useState("");
-  const [employerId, setEmployerId] = useState<string>("");
-  const [employerOptions, setEmployerOptions] = useState<EmployerItem[]>([]);
-  const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
-
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Same role as ExportForm jobProgress: determinate scan only in «By query» mode. */
+  const [jobProgress, setJobProgress] = useState<{ done: number; total: number } | null>(null);
   const [summary, setSummary] = useState<ExportSummary | null>(null);
   const [byQuery, setByQuery] = useState<Array<{ query: string; summary: ExportSummary }>>([]);
-  const [byQueryDone, setByQueryDone] = useState(0);
-  const [byQueryTotal, setByQueryTotal] = useState(0);
-  const [compareA, setCompareA] = useState<ExportSummary | null>(null);
-  const [compareB, setCompareB] = useState<ExportSummary | null>(null);
-  const [comparePeriod, setComparePeriod] = useState<Array<{ period: number; summary: ExportSummary }>>([]);
   const byQueryAbortRef = useRef<AbortController | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const pollAbortRef = useRef<AbortController | null>(null);
 
-  // Segment B filter state (A uses the existing area/experience/employer)
-  const [experienceIdB, setExperienceIdB] = useState<string>("");
-  const [areaQueryB, setAreaQueryB] = useState("");
-  const [areaIdB, setAreaIdB] = useState<string>("");
-  const [areaDropdownOpenB, setAreaDropdownOpenB] = useState(false);
-  const [companyQueryB, setCompanyQueryB] = useState("");
-  const [employerIdB, setEmployerIdB] = useState<string>("");
-  const [employerOptionsB, setEmployerOptionsB] = useState<EmployerItem[]>([]);
-  const [companyDropdownOpenB, setCompanyDropdownOpenB] = useState(false);
-  const [periodPreset, setPeriodPreset] = useState<1 | 7 | 30>(7);
+  type JobStatus = {
+    job_id: string;
+    status: string;
+    kind?: string | null;
+    progress_done?: number | null;
+    progress_total?: number | null;
+    warnings_count?: number | null;
+    summary?: ExportSummary | null;
+  };
 
-  useEffect(() => {
-    if (!baseUrl) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const headers: Record<string, string> = {};
-        if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
+  function stopAllRequests() {
+    abortRef.current?.abort();
+    pollAbortRef.current?.abort();
+    byQueryAbortRef.current?.abort();
+  }
 
-        const [dictResp, areasResp] = await Promise.all([
-          fetch(`${baseUrl}/api/v1/meta/dictionaries`, { headers }),
-          fetch(`${baseUrl}/api/v1/meta/areas`, { headers }),
-        ]);
-
-        const dictJson = dictResp.ok ? ((await dictResp.json()) as any) : null;
-        const areasJson = areasResp.ok ? ((await areasResp.json()) as any) : null;
-
-        if (cancelled) return;
-
-        const exp = Array.isArray(dictJson?.experience) ? (dictJson.experience as ExperienceItem[]) : [];
-        setExperienceOptions(exp);
-
-        const flat = Array.isArray(areasJson) ? flattenAreas(areasJson as AreaNode[]) : [];
-        setAreaOptions(flat);
-      } catch {
-        // ignore meta load failures; user can still run without filters
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+  function basePayload(queries: string[]): Record<string, unknown> {
+    return {
+      queries,
+      pages,
+      per_page: perPage,
+      kw_top_n: kwTopN,
+      kw_max_ngram: kwMaxNgram,
+      sleep_s: sleepS,
+      search_sleep_s: searchSleepS,
+      ...(hhToken.trim() ? { token: hhToken.trim() } : {}),
     };
-  }, [baseUrl, apiKey]);
-
-  useEffect(() => {
-    if (!baseUrl) return;
-    const q = companyQuery.trim();
-    if (q.length < 2) {
-      setEmployerOptions([]);
-      return;
-    }
-
-    const ctrl = new AbortController();
-    const tmr = window.setTimeout(async () => {
-      try {
-        const headers: Record<string, string> = {};
-        if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
-        const url = new URL(`${baseUrl}/api/v1/meta/employers`);
-        url.searchParams.set("text", q);
-        const resp = await fetch(url.toString(), { headers, signal: ctrl.signal });
-        if (!resp.ok) return;
-        const json = (await resp.json()) as any;
-        const items = Array.isArray(json?.items) ? (json.items as EmployerItem[]) : [];
-        setEmployerOptions(items.slice(0, 12));
-      } catch {
-        // ignore
-      }
-    }, 250);
-
-    return () => {
-      window.clearTimeout(tmr);
-      ctrl.abort();
-    };
-  }, [baseUrl, apiKey, companyQuery]);
-
-  useEffect(() => {
-    if (!baseUrl) return;
-    const q = companyQueryB.trim();
-    if (q.length < 2) {
-      setEmployerOptionsB([]);
-      return;
-    }
-
-    const ctrl = new AbortController();
-    const tmr = window.setTimeout(async () => {
-      try {
-        const headers: Record<string, string> = {};
-        if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
-        const url = new URL(`${baseUrl}/api/v1/meta/employers`);
-        url.searchParams.set("text", q);
-        const resp = await fetch(url.toString(), { headers, signal: ctrl.signal });
-        if (!resp.ok) return;
-        const json = (await resp.json()) as any;
-        const items = Array.isArray(json?.items) ? (json.items as EmployerItem[]) : [];
-        setEmployerOptionsB(items.slice(0, 12));
-      } catch {
-        // ignore
-      }
-    }, 250);
-
-    return () => {
-      window.clearTimeout(tmr);
-      ctrl.abort();
-    };
-  }, [baseUrl, apiKey, companyQueryB]);
-
-  const filteredAreas = useMemo(() => {
-    const q = areaQuery.trim().toLowerCase();
-    if (!q) return areaOptions.slice(0, 12);
-    return areaOptions.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 12);
-  }, [areaOptions, areaQuery]);
+  }
 
   async function fetchSummary(payload: Record<string, unknown>, signal?: AbortSignal): Promise<ExportSummary> {
     if (!baseUrl) throw new Error(t("form.errNoUrl"));
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
-
     const resp = await fetch(`${baseUrl}/api/v1/summary/auto`, {
       method: "POST",
       headers,
@@ -222,107 +111,136 @@ export default function SummaryPage() {
       if (code === "search_failed") throw new Error(t("form.errSearchFailed"));
       throw new Error(apiErr.message || resp.statusText || t("summary.errUnknown"));
     }
-    const json = (await resp.json()) as any;
-    const s = json?.summary as ExportSummary | undefined;
+    const json = (await resp.json()) as { summary?: ExportSummary };
+    const s = json?.summary;
     if (!s) throw new Error(t("summary.errBadResponse"));
     return s;
   }
 
-  function basePayload(queries: string[]) {
-    return {
-      queries,
-      pages,
-      per_page: perPage,
-      kw_top_n: kwTopN,
-      kw_max_ngram: kwMaxNgram,
-      sleep_s: sleepS,
-      search_sleep_s: searchSleepS,
-      ...(periodDays !== "" ? { period: periodDays } : {}),
-      ...(hhToken.trim() ? { token: hhToken.trim() } : {}),
-    } as Record<string, unknown>;
-  }
-
-  function payloadForSegment(
-    queries: string[],
-    seg: { employer_id?: string; experience?: string; area?: string }
-  ): Record<string, unknown> {
-    return {
-      ...basePayload(queries),
-      ...(seg.employer_id ? { employer_id: seg.employer_id } : {}),
-      ...(seg.experience ? { experience: seg.experience } : {}),
-      ...(seg.area ? { area: seg.area } : {}),
-    };
+  function validateCommon(): boolean {
+    const queries = linesFromTextarea(queriesText);
+    if (queries.length === 0) {
+      setError(t("form.errNoAuto"));
+      return false;
+    }
+    if (pages === "" || pages <= 0) {
+      setError(t("form.errPagesRequired"));
+      return false;
+    }
+    if (perPage === "" || perPage <= 0) {
+      setError(t("form.errPerPageRequired"));
+      return false;
+    }
+    return true;
   }
 
   async function runAggregate() {
     setError(null);
+    setMessage(null);
+    setJobProgress(null);
     setSummary(null);
     setByQuery([]);
-    setByQueryDone(0);
-    setByQueryTotal(0);
-    setCompareA(null);
-    setCompareB(null);
-    setComparePeriod([]);
+    if (!baseUrl) {
+      setError(t("form.errNoUrl"));
+      return;
+    }
+    if (!validateCommon()) return;
 
     const queries = linesFromTextarea(queriesText);
-    if (queries.length === 0) {
-      setError(t("form.errNoAuto"));
-      return;
-    }
-    if (pages === "" || pages <= 0) {
-      setError(t("form.errPagesRequired"));
-      return;
-    }
-    if (perPage === "" || perPage <= 0) {
-      setError(t("form.errPerPageRequired"));
-      return;
-    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
 
     setBusy(true);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const pollAc = new AbortController();
+    pollAbortRef.current = pollAc;
+
     try {
-      const s = await fetchSummary(
-        payloadForSegment(queries, { employer_id: employerId, experience: experienceId, area: areaId })
-      );
+      const startResp = await fetch(`${baseUrl}/api/v1/summary/auto/async`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(basePayload(queries)),
+        signal: ac.signal,
+      });
+      if (!startResp.ok) {
+        const text = await startResp.text();
+        const apiErr = parseApiErrorText(text);
+        throw new Error(apiErr.message || startResp.statusText || t("summary.errUnknown"));
+      }
+      const started = (await startResp.json()) as any;
+      const jobId = typeof started?.job_id === "string" ? started.job_id : "";
+      if (!jobId) {
+        setError(t("form.errBadJob"));
+        return;
+      }
+
+      setMessage(t("form.jobStarted"));
+
+      let last: JobStatus | null = null;
+      for (let attempt = 0; attempt < 10_000; attempt++) {
+        if (pollAc.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        const stResp = await fetch(`${baseUrl}/api/v1/jobs/${jobId}`, {
+          method: "GET",
+          headers: apiKey.trim() ? { "X-API-Key": apiKey.trim() } : undefined,
+          signal: pollAc.signal,
+        });
+        if (!stResp.ok) throw new Error(t("form.errJobStatus"));
+        const st = (await stResp.json()) as JobStatus;
+        last = st;
+
+        const done = typeof st.progress_done === "number" ? st.progress_done : 0;
+        const total = typeof st.progress_total === "number" ? st.progress_total : 0;
+        if (total > 0) setJobProgress({ done, total });
+
+        if (st.status === "succeeded") break;
+        if (st.status === "failed") throw new Error(t("form.errJobFailed"));
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      const s = last?.summary ?? null;
+      if (!s) throw new Error(t("summary.errBadResponse"));
       setSummary(s);
+      setMessage(t("form.summaryReady"));
     } catch (e) {
+      const isAbort =
+        (e instanceof DOMException && e.name === "AbortError") || (e instanceof Error && e.name === "AbortError");
+      if (isAbort) {
+        setMessage(t("form.exportAborted"));
+        setError(null);
+        setSummary(null);
+        return;
+      }
+      setMessage(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setJobProgress(null);
+      abortRef.current = null;
+      pollAbortRef.current = null;
     }
   }
 
   async function runByQuery() {
     setError(null);
+    setMessage(null);
+    setJobProgress(null);
     setSummary(null);
     setByQuery([]);
-    setByQueryDone(0);
-    setByQueryTotal(0);
-    setCompareA(null);
-    setCompareB(null);
-    setComparePeriod([]);
+    if (!baseUrl) {
+      setError(t("form.errNoUrl"));
+      return;
+    }
+    if (!validateCommon()) return;
 
     const queries = linesFromTextarea(queriesText);
-    if (queries.length === 0) {
-      setError(t("form.errNoAuto"));
-      return;
-    }
-    if (pages === "" || pages <= 0) {
-      setError(t("form.errPagesRequired"));
-      return;
-    }
-    if (perPage === "" || perPage <= 0) {
-      setError(t("form.errPerPageRequired"));
-      return;
-    }
-
-    const seg = { employer_id: employerId, experience: experienceId, area: areaId };
-
+    setMessage(t("form.jobStarted"));
     setBusy(true);
     const ac = new AbortController();
     byQueryAbortRef.current = ac;
-    setByQueryTotal(queries.length);
+    setJobProgress({ done: 0, total: queries.length });
+
     try {
-      // Concurrency limit: 3
       const limit = 3;
       const results: Array<{ query: string; summary: ExportSummary }> = [];
       let i = 0;
@@ -331,131 +249,43 @@ export default function SummaryPage() {
           if (ac.signal.aborted) return;
           const idx = i++;
           const q = queries[idx];
-          const s = await fetchSummary(payloadForSegment([q], seg), ac.signal);
+          const s = await fetchSummary(basePayload([q]), ac.signal);
           results.push({ query: q, summary: s });
           setByQuery([...results].sort((a, b) => a.query.localeCompare(b.query)));
-          setByQueryDone(results.length);
+          setJobProgress({ done: results.length, total: queries.length });
         }
       }
       await Promise.all(Array.from({ length: Math.min(limit, queries.length) }, () => worker()));
       setByQuery(results);
+      setMessage(t("form.summaryReady"));
     } catch (e) {
       const isAbort =
         (e instanceof DOMException && e.name === "AbortError") || (e instanceof Error && e.name === "AbortError");
       if (isAbort) {
         setError(null);
         setByQuery([]);
-        setByQueryDone(0);
-        setByQueryTotal(0);
+        setMessage(t("form.exportAborted"));
         return;
       }
+      setMessage(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setJobProgress(null);
       byQueryAbortRef.current = null;
     }
   }
 
-  async function runCompareSegments() {
-    setError(null);
-    setSummary(null);
-    setByQuery([]);
-    setCompareA(null);
-    setCompareB(null);
-    setComparePeriod([]);
-
-    const queries = linesFromTextarea(queriesText);
-    if (queries.length === 0) {
-      setError(t("form.errNoAuto"));
-      return;
-    }
-    if (pages === "" || pages <= 0) {
-      setError(t("form.errPagesRequired"));
-      return;
-    }
-    if (perPage === "" || perPage <= 0) {
-      setError(t("form.errPerPageRequired"));
-      return;
-    }
-
-    const segA = { employer_id: employerId, experience: experienceId, area: areaId };
-    const segB = { employer_id: employerIdB, experience: experienceIdB, area: areaIdB };
-
-    setBusy(true);
-    try {
-      const [a, b] = await Promise.all([
-        fetchSummary(payloadForSegment(queries, segA)),
-        fetchSummary(payloadForSegment(queries, segB)),
-      ]);
-      setCompareA(a);
-      setCompareB(b);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runComparePeriod() {
-    setError(null);
-    setSummary(null);
-    setByQuery([]);
-    setCompareA(null);
-    setCompareB(null);
-    setComparePeriod([]);
-
-    const queries = linesFromTextarea(queriesText);
-    if (queries.length === 0) {
-      setError(t("form.errNoAuto"));
-      return;
-    }
-    if (pages === "" || pages <= 0) {
-      setError(t("form.errPagesRequired"));
-      return;
-    }
-    if (perPage === "" || perPage <= 0) {
-      setError(t("form.errPerPageRequired"));
-      return;
-    }
-
-    const seg = { employer_id: employerId, experience: experienceId, area: areaId };
-    const periods = [1, 7, 30];
-
-    setBusy(true);
-    try {
-      const results: Array<{ period: number; summary: ExportSummary }> = [];
-      for (const p of periods) {
-        const payload = { ...payloadForSegment(queries, seg), period: p };
-        const s = await fetchSummary(payload);
-        results.push({ period: p, summary: s });
-        setComparePeriod([...results]);
-      }
-      setComparePeriod(results);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function clearCompany() {
-    setEmployerId("");
-    setCompanyQuery("");
-    setEmployerOptions([]);
-  }
-
-  function clearArea() {
-    setAreaId("");
-    setAreaQuery("");
+  function onSubmit() {
+    if (viewMode === "aggregate") void runAggregate();
+    else void runByQuery();
   }
 
   return (
     <section className="container-shell py-6 sm:py-10 md:py-14">
       <header className="mb-6 anim-fade-up sm:mb-8">
         <p className="badge">{t("summary.badge")}</p>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl">
-          {t("summary.title")}
-        </h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl">{t("summary.title")}</h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-[var(--muted)] lg:max-w-3xl lg:text-lg">
           {t("summary.subtitle")}
         </p>
@@ -463,230 +293,102 @@ export default function SummaryPage() {
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1fr_360px]">
         <article className="card-soft glass-shine anim-fade-up p-4 sm:p-5 md:p-7">
-          {!baseUrl && (
-            <p
-              className="rounded-xl border px-4 py-3 text-sm"
-              style={{
-                background: "var(--warning-bg)",
-                color: "var(--warning-text)",
-                borderColor: "color-mix(in srgb, var(--warning-text), transparent 55%)",
-              }}
-            >
-              {t("form.noApiUrl")}
-            </p>
-          )}
+          <form
+            className="flex flex-col gap-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+            aria-label={t("summary.title")}
+          >
+            {!baseUrl && (
+              <p
+                className="rounded-xl border px-4 py-3 text-sm"
+                style={{
+                  background: "var(--warning-bg)",
+                  color: "var(--warning-text)",
+                  borderColor: "color-mix(in srgb, var(--warning-text), transparent 55%)",
+                }}
+              >
+                {t("form.noApiUrl")}
+              </p>
+            )}
 
-          <div className="grid gap-4">
-            <fieldset className="grid gap-2">
-              <legend className="text-sm font-semibold text-[var(--text)]">{t("summary.modes.title")}</legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(
-                  [
-                    ["aggregate", t("summary.modes.aggregate")],
-                    ["byQuery", t("summary.modes.byQuery")],
-                    ["compareSegments", t("summary.modes.compareSegments")],
-                    ["comparePeriod", t("summary.modes.comparePeriod")],
-                  ] as const
-                ).map(([id, label]) => (
-                  <label key={id} className="surface-glass-sm flex cursor-pointer items-center gap-2 p-3 text-sm">
-                    <input
-                      type="radio"
-                      checked={viewMode === id}
-                      onChange={() => setViewMode(id)}
-                      className="accent-[var(--primary)]"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+            <fieldset className="grid gap-3 sm:grid-cols-2">
+              <legend className="mb-2 text-sm font-medium text-[var(--muted)] lg:text-base">{t("summary.modes.title")}</legend>
+              <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm lg:p-3.5 lg:text-base">
+                <input
+                  type="radio"
+                  className="accent-[var(--primary)]"
+                  checked={viewMode === "aggregate"}
+                  onChange={() => setViewMode("aggregate")}
+                />
+                {t("summary.modes.aggregate")}
+              </label>
+              <label className="surface-glass-sm anim-fade-up flex cursor-pointer items-center gap-2 p-3 text-sm lg:p-3.5 lg:text-base">
+                <input
+                  type="radio"
+                  className="accent-[var(--primary)]"
+                  checked={viewMode === "byQuery"}
+                  onChange={() => setViewMode("byQuery")}
+                />
+                {t("summary.modes.byQuery")}
+              </label>
             </fieldset>
 
-            <label className="form-field">
-              <span className="form-label inline-flex items-center">{t("summary.queriesLabel")}</span>
-              <textarea
-                value={queriesText}
-                onChange={(e) => setQueriesText(e.target.value)}
-                className="input-ui min-h-28 text-sm lg:text-base"
-                spellCheck={false}
-              />
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="form-field">
-                <span className="form-label inline-flex items-center">{t("form.pages")}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={pages}
-                  onChange={(e) => setPages(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="input-ui"
-                />
-              </label>
-              <label className="form-field">
-                <span className="form-label inline-flex items-center">{t("form.perPage")}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={perPage}
-                  onChange={(e) => setPerPage(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="input-ui"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="form-field relative">
-                <span className="form-label inline-flex items-center">
-                  {t("summary.companyLabel")}{" "}
-                  <span className="text-xs text-[var(--muted)]">({t("summary.segmentA")})</span>
-                </span>
-                <input
-                  value={companyQuery}
-                  onChange={(e) => {
-                    setCompanyQuery(e.target.value);
-                    setEmployerId("");
-                    setCompanyDropdownOpen(true);
-                  }}
-                  onFocus={() => setCompanyDropdownOpen(true)}
-                  onBlur={() => window.setTimeout(() => setCompanyDropdownOpen(false), 150)}
-                  className="input-ui"
-                  placeholder={t("summary.companyPlaceholder")}
-                />
-                {(employerId || companyQuery) && (
-                  <button
-                    type="button"
-                    className="btn-soft mt-2 w-full px-3 py-2 text-xs font-semibold"
-                    onClick={clearCompany}
-                  >
-                    {t("summary.clearCompany")}
-                  </button>
-                )}
-                {companyDropdownOpen && employerOptions.length > 0 && (
-                  <div className="mt-2 overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[color:var(--glass-bg)] shadow-2xl">
-                    <ul className="max-h-72 overflow-auto py-1 text-sm">
-                      {employerOptions.map((it) => (
-                        <li key={it.id}>
-                          <button
-                            type="button"
-                            className="w-full px-3 py-2 text-left hover:bg-[color:var(--glass-bg-strong)]"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              setEmployerId(String(it.id));
-                              setCompanyQuery(it.name);
-                              setCompanyDropdownOpen(false);
-                            }}
-                          >
-                            <span className="font-medium">{it.name}</span>
-                            {typeof it.open_vacancies === "number" && (
-                              <span className="ml-2 text-xs text-[var(--muted)] tabular-nums">
-                                {t("summary.openVacancies", { n: String(it.open_vacancies) })}
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {employerId && (
-                  <p className="mt-2 text-xs text-[var(--muted)]">
-                    {t("summary.selectedEmployerId", { id: employerId })}
-                  </p>
-                )}
-              </label>
-
+            <section className="grid gap-4">
               <label className="form-field">
                 <span className="form-label inline-flex items-center">
-                  {t("summary.levelLabel")}{" "}
-                  <span className="text-xs text-[var(--muted)]">({t("summary.segmentA")})</span>
+                  {t("summary.queriesLabel")}
+                  <TooltipIcon text={t("form.autoLabelHelp")} alt={t("form.tooltipAlt")} />
                 </span>
-                <select
-                  value={experienceId}
-                  onChange={(e) => setExperienceId(e.target.value)}
-                  className="input-ui"
-                >
-                  <option value="">{t("summary.anyOption")}</option>
-                  {experienceOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.name}
-                    </option>
-                  ))}
-                </select>
+                <textarea
+                  value={queriesText}
+                  onChange={(e) => setQueriesText(e.target.value)}
+                  className="input-ui min-h-28 text-sm lg:text-base"
+                  spellCheck={false}
+                />
               </label>
-            </div>
-
-            <label className="form-field relative">
-              <span className="form-label inline-flex items-center">
-                {t("summary.locationLabel")}{" "}
-                <span className="text-xs text-[var(--muted)]">({t("summary.segmentA")})</span>
-              </span>
-              <input
-                value={areaQuery}
-                onChange={(e) => {
-                  setAreaQuery(e.target.value);
-                  setAreaId("");
-                  setAreaDropdownOpen(true);
-                }}
-                onFocus={() => setAreaDropdownOpen(true)}
-                onBlur={() => window.setTimeout(() => setAreaDropdownOpen(false), 150)}
-                className="input-ui"
-                placeholder={t("summary.locationPlaceholder")}
-              />
-              {(areaId || areaQuery) && (
-                <button
-                  type="button"
-                  className="btn-soft mt-2 w-full px-3 py-2 text-xs font-semibold"
-                  onClick={clearArea}
-                >
-                  {t("summary.clearLocation")}
-                </button>
-              )}
-              {areaDropdownOpen && filteredAreas.length > 0 && (
-                <div className="mt-2 overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[color:var(--glass-bg)] shadow-2xl">
-                  <ul className="max-h-72 overflow-auto py-1 text-sm">
-                    {filteredAreas.map((it) => (
-                      <li key={it.id}>
-                        <button
-                          type="button"
-                          className="w-full px-3 py-2 text-left hover:bg-[color:var(--glass-bg-strong)]"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setAreaId(String(it.id));
-                            setAreaQuery(it.name);
-                            setAreaDropdownOpen(false);
-                          }}
-                        >
-                          <span className="font-medium">{it.name}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {areaId && <p className="mt-2 text-xs text-[var(--muted)]">{t("summary.selectedAreaId", { id: areaId })}</p>}
-            </label>
-
-            <details className="surface-glass-sm rounded-xl p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">
-                {t("summary.advanced")}
-              </summary>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("summary.periodLabel")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.pages")}
+                    <TooltipIcon text={t("form.pagesHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="number"
                     min={1}
-                    max={30}
-                    value={periodDays}
-                    onChange={(e) => setPeriodDays(e.target.value === "" ? "" : Number(e.target.value))}
+                    max={20}
+                    value={pages}
+                    onChange={(e) => setPages(e.target.value === "" ? "" : Number(e.target.value))}
                     className="input-ui"
-                    placeholder={t("summary.periodPh")}
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.kwTopN")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.perPage")}
+                    <TooltipIcon text={t("form.perPageHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={perPage}
+                    onChange={(e) => setPerPage(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="input-ui"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <details className="surface-glass-sm rounded-xl p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">{t("summary.advanced")}</summary>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="form-field">
+                  <span className="form-label inline-flex items-center">
+                    {t("form.kwTopN")}
+                    <TooltipIcon text={t("form.kwTopNHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="number"
                     min={1}
@@ -697,7 +399,10 @@ export default function SummaryPage() {
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.kwMaxNgram")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.kwMaxNgram")}
+                    <TooltipIcon text={t("form.kwMaxNgramHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="number"
                     min={1}
@@ -708,7 +413,10 @@ export default function SummaryPage() {
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.sleep")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.sleep")}
+                    <TooltipIcon text={t("form.sleepHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -720,7 +428,10 @@ export default function SummaryPage() {
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.searchSleep")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.searchSleep")}
+                    <TooltipIcon text={t("form.searchSleepHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -732,7 +443,10 @@ export default function SummaryPage() {
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.hhToken")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.hhToken")}
+                    <TooltipIcon text={t("form.hhTokenHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="password"
                     value={hhToken}
@@ -742,7 +456,10 @@ export default function SummaryPage() {
                   />
                 </label>
                 <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("form.apiKey")}</span>
+                  <span className="form-label inline-flex items-center">
+                    {t("form.apiKey")}
+                    <TooltipIcon text={t("form.apiKeyHelp")} alt={t("form.tooltipAlt")} />
+                  </span>
                   <input
                     type="password"
                     value={apiKey}
@@ -767,30 +484,44 @@ export default function SummaryPage() {
               </p>
             )}
 
+            {message && (
+              <p
+                className="rounded-xl border px-4 py-3 text-sm"
+                style={{
+                  background: "var(--success-bg)",
+                  color: "var(--success-text)",
+                  borderColor: "color-mix(in srgb, var(--success-text), transparent 65%)",
+                }}
+              >
+                {message}
+              </p>
+            )}
+
             <button
-              type="button"
+              type="submit"
               disabled={busy}
               className="btn-primary w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto lg:px-6 lg:py-3.5 lg:text-base"
-              onClick={() => {
-                if (viewMode === "aggregate") return void runAggregate();
-                if (viewMode === "byQuery") return void runByQuery();
-                if (viewMode === "compareSegments") return void runCompareSegments();
-                return void runComparePeriod();
-              }}
             >
-              {busy ? t("summary.btnBusy") : t("summary.btnReady")}
+              {busy ? t("form.btnBusy") : t("summary.btnReady")}
             </button>
 
             <LongRunningProgress
-              visible={busy && viewMode === "byQuery"}
-              variant="determinate"
-              label={t("summary.byQuery.progress", { done: String(byQueryDone), total: String(byQueryTotal) })}
-              done={byQueryDone}
-              total={byQueryTotal}
+              visible={busy}
+              variant={jobProgress ? "determinate" : "indeterminate"}
+              label={
+                jobProgress
+                  ? t("form.progressExportPct", {
+                      done: String(jobProgress.done),
+                      total: String(jobProgress.total),
+                    })
+                  : t("form.progressExport")
+              }
+              done={jobProgress?.done}
+              total={jobProgress?.total}
               cancelLabel={t("form.btnCancel")}
-              onCancel={() => byQueryAbortRef.current?.abort()}
+              onCancel={busy ? () => stopAllRequests() : undefined}
             />
-          </div>
+          </form>
         </article>
 
         <aside className="space-y-4">
@@ -806,13 +537,13 @@ export default function SummaryPage() {
       </div>
 
       {summary && viewMode === "aggregate" && (
-        <section className="mt-6 sm:mt-10">
+        <section className="mt-6 anim-fade-up sm:mt-10">
           <SummaryView summary={summary} />
         </section>
       )}
 
       {viewMode === "byQuery" && byQuery.length > 0 && (
-        <section className="mt-6 grid gap-4 sm:mt-10 sm:gap-6">
+        <section className="mt-6 grid gap-4 anim-fade-up sm:mt-10 sm:gap-6">
           <h2 className="text-base font-semibold lg:text-lg">{t("summary.byQuery.title")}</h2>
           <div className="grid gap-6 lg:grid-cols-2">
             {byQuery.map((row) => (
@@ -827,192 +558,6 @@ export default function SummaryPage() {
           </div>
         </section>
       )}
-
-      {viewMode === "compareSegments" && (
-        <section className="mt-6 grid gap-6 sm:mt-10">
-          <h2 className="text-base font-semibold lg:text-lg">{t("summary.compareSegments.title")}</h2>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="card-soft glass-shine p-4 sm:p-5">
-              <h3 className="font-semibold">{t("summary.segmentA")}</h3>
-              <p className="mt-1 text-xs text-[var(--muted)]">{t("summary.compareSegments.usesMainFilters")}</p>
-            </div>
-            <div className="card-soft glass-shine p-4 sm:p-5">
-              <h3 className="font-semibold">{t("summary.segmentB")}</h3>
-              <div className="mt-4 grid gap-3">
-                <label className="form-field relative">
-                  <span className="form-label inline-flex items-center">{t("summary.companyLabel")}</span>
-                  <input
-                    value={companyQueryB}
-                    onChange={(e) => {
-                      setCompanyQueryB(e.target.value);
-                      setEmployerIdB("");
-                      setCompanyDropdownOpenB(true);
-                    }}
-                    onFocus={() => setCompanyDropdownOpenB(true)}
-                    onBlur={() => window.setTimeout(() => setCompanyDropdownOpenB(false), 150)}
-                    className="input-ui"
-                    placeholder={t("summary.companyPlaceholder")}
-                  />
-                  {companyDropdownOpenB && employerOptionsB.length > 0 && (
-                    <div className="mt-2 overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[color:var(--glass-bg)] shadow-2xl">
-                      <ul className="max-h-72 overflow-auto py-1 text-sm">
-                        {employerOptionsB.map((it) => (
-                          <li key={it.id}>
-                            <button
-                              type="button"
-                              className="w-full px-3 py-2 text-left hover:bg-[color:var(--glass-bg-strong)]"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setEmployerIdB(String(it.id));
-                                setCompanyQueryB(it.name);
-                                setCompanyDropdownOpenB(false);
-                              }}
-                            >
-                              <span className="font-medium">{it.name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </label>
-
-                <label className="form-field">
-                  <span className="form-label inline-flex items-center">{t("summary.levelLabel")}</span>
-                  <select value={experienceIdB} onChange={(e) => setExperienceIdB(e.target.value)} className="input-ui">
-                    <option value="">{t("summary.anyOption")}</option>
-                    {experienceOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="form-field relative">
-                  <span className="form-label inline-flex items-center">{t("summary.locationLabel")}</span>
-                  <input
-                    value={areaQueryB}
-                    onChange={(e) => {
-                      setAreaQueryB(e.target.value);
-                      setAreaIdB("");
-                      setAreaDropdownOpenB(true);
-                    }}
-                    onFocus={() => setAreaDropdownOpenB(true)}
-                    onBlur={() => window.setTimeout(() => setAreaDropdownOpenB(false), 150)}
-                    className="input-ui"
-                    placeholder={t("summary.locationPlaceholder")}
-                  />
-                  {areaDropdownOpenB && filteredAreas.length > 0 && (
-                    <div className="mt-2 overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[color:var(--glass-bg)] shadow-2xl">
-                      <ul className="max-h-72 overflow-auto py-1 text-sm">
-                        {filteredAreas.map((it) => (
-                          <li key={it.id}>
-                            <button
-                              type="button"
-                              className="w-full px-3 py-2 text-left hover:bg-[color:var(--glass-bg-strong)]"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setAreaIdB(String(it.id));
-                                setAreaQueryB(it.name);
-                                setAreaDropdownOpenB(false);
-                              }}
-                            >
-                              <span className="font-medium">{it.name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {compareA && compareB && (
-            <>
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="grid gap-4">
-                  <div className="surface-glass-sm p-3 font-semibold">{t("summary.segmentA")}</div>
-                  <SummaryView summary={compareA} />
-                </div>
-                <div className="grid gap-4">
-                  <div className="surface-glass-sm p-3 font-semibold">{t("summary.segmentB")}</div>
-                  <SummaryView summary={compareB} />
-                </div>
-              </div>
-
-              {compareA.coverage && compareB.coverage && (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <DiffTable
-                    title={t("summary.diff.skillsTitle")}
-                    aLabel={t("summary.segmentA")}
-                    bLabel={t("summary.segmentB")}
-                    aItems={compareA.top_skills}
-                    bItems={compareB.top_skills}
-                    aSuccessful={compareA.coverage.successful}
-                    bSuccessful={compareB.coverage.successful}
-                  />
-                  <DiffTable
-                    title={t("summary.diff.keywordsTitle")}
-                    aLabel={t("summary.segmentA")}
-                    bLabel={t("summary.segmentB")}
-                    aItems={compareA.top_keywords}
-                    bItems={compareB.top_keywords}
-                    aSuccessful={compareA.coverage.successful}
-                    bSuccessful={compareB.coverage.successful}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      {viewMode === "comparePeriod" && (
-        <section className="mt-6 grid gap-6 sm:mt-10">
-          <h2 className="text-base font-semibold lg:text-lg">{t("summary.comparePeriod.title")}</h2>
-          {comparePeriod.length > 0 && (
-            <div className="card-soft glass-shine p-4 sm:p-5">
-              <h3 className="font-semibold">{t("summary.comparePeriod.sparklinesTitle")}</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <div className="surface-glass-sm p-3">
-                  <p className="text-xs text-[var(--muted)]">{t("summary.comparePeriod.metricKeySkillsRate")}</p>
-                  <Sparkline values={comparePeriod.map((r) => (r.summary.coverage?.key_skills_rate ?? 0) * 100)} />
-                </div>
-                <div className="surface-glass-sm p-3">
-                  <p className="text-xs text-[var(--muted)]">{t("summary.comparePeriod.metricErrors")}</p>
-                  <Sparkline values={comparePeriod.map((r) => r.summary.errors)} />
-                </div>
-                <div className="surface-glass-sm p-3">
-                  <p className="text-xs text-[var(--muted)]">{t("summary.comparePeriod.metricEmptyDesc")}</p>
-                  <Sparkline values={comparePeriod.map((r) => r.summary.coverage?.without_description ?? 0)} />
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-[var(--muted)]">
-                {t("summary.comparePeriod.periodsNote")}
-              </p>
-            </div>
-          )}
-
-          {comparePeriod.length > 0 && (
-            <div className="grid gap-6 lg:grid-cols-3">
-              {comparePeriod.map((row) => (
-                <div key={row.period} className="grid gap-4">
-                  <div className="surface-glass-sm p-3">
-                    <p className="text-xs text-[var(--muted)]">{t("summary.comparePeriod.periodLabel")}</p>
-                    <p className="mt-1 font-semibold tabular-nums">{row.period}</p>
-                  </div>
-                  <SummaryView summary={row.summary} />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
     </section>
   );
 }
-

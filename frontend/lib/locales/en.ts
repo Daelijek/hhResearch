@@ -243,6 +243,7 @@ export const en = {
   "form.progressExportPct": "Exporting {done} / {total}…",
   "form.exportAborted": "Cancelled by user.",
   "form.jobStarted": "Started. Fetching progress…",
+  "form.summaryReady": "Summary is ready.",
   "form.errBadJob": "Bad response: missing job_id.",
   "form.errJobStatus": "Failed to read job status.",
   "form.errJobFailed": "Export job failed.",

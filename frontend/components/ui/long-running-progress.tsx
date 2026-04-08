@@ -25,7 +25,7 @@ export function LongRunningProgress({
       : null;
 
   return (
-    <div className="surface-glass-sm mt-3 flex flex-col gap-2 rounded-xl p-3">
+    <div className="anim-fade-up surface-glass-sm mt-3 flex flex-col gap-2 rounded-xl p-3">
       <style>{`
         @keyframes hhProgressSlide {
           0% { transform: translateX(-120%); }
@@ -70,4 +70,3 @@ export function LongRunningProgress({
     </div>
   );
 }
-

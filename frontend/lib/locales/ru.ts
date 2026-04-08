@@ -244,6 +244,7 @@ export const ru = {
   "form.progressExportPct": "Выгрузка {done} / {total}…",
   "form.exportAborted": "Отменено пользователем.",
   "form.jobStarted": "Запущено. Получаем прогресс…",
+  "form.summaryReady": "Сводка готова.",
   "form.errBadJob": "Некорректный ответ: нет job_id.",
   "form.errJobStatus": "Не удалось получить статус задачи.",
   "form.errJobFailed": "Задача выгрузки завершилась с ошибкой.",

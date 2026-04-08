@@ -88,9 +88,11 @@ def compute_summary_for_refs(
     kw_top_n: int,
     kw_max_ngram: int,
     sleep_s: float,
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> Tuple[List[str], Dict[str, Any]]:
     total = len(refs)
     processed = 0
+    attempted = 0
     errors: List[str] = []
     keyword_freq: Counter[str] = Counter()
     skill_freq: Counter[str] = Counter()
@@ -98,12 +100,18 @@ def compute_summary_for_refs(
     without_key_skills = 0
     without_description = 0
 
+    if on_progress and total > 0:
+        on_progress(0, total)
+
     for ref in refs:
         vid = ref.vacancy_id
         try:
             vac = fetch_vacancy(session, token, vid)
         except Exception as e:
             errors.append(f"{vid}: {e}")
+            attempted += 1
+            if on_progress and total > 0:
+                on_progress(attempted, total)
             continue
 
         _title, _vid, _link, keywords, skill_names = extract_skills_and_keywords(
@@ -126,6 +134,17 @@ def compute_summary_for_refs(
             without_description += 1
 
         processed += 1
+        attempted += 1
+        if on_progress and total > 0:
+            # Keep it smooth for small totals; throttle for larger sets.
+            if attempted == total:
+                on_progress(attempted, total)
+            elif total <= 20:
+                on_progress(attempted, total)
+            elif total <= 100 and attempted % 5 == 0:
+                on_progress(attempted, total)
+            elif attempted % 10 == 0:
+                on_progress(attempted, total)
         if sleep_s > 0:
             time.sleep(sleep_s)
 

@@ -8,7 +8,7 @@ from uuid import uuid4
 import requests
 
 from hh_research.client import VacancyRef, dedupe_vacancy_refs_preserve_order
-from hh_research.pipeline import collect_refs_auto, export_refs_to_xlsx_bytes
+from hh_research.pipeline import collect_refs_auto, compute_summary_for_refs, export_refs_to_xlsx_bytes
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -102,6 +102,68 @@ def _run_export_job(job_id: str, job_kind: str, payload: Dict[str, Any]) -> None
 
     try:
         token = payload.get("token")
+
+        if job_kind == "summary_auto":
+            session = requests.Session()
+            queries: List[str] = payload["queries"]
+            refs, raw_id_hits = collect_refs_auto(
+                session=session,
+                token=token,
+                queries=queries,
+                pages=int(payload["pages"]),
+                per_page=int(payload["per_page"]),
+                dedupe_vacancies=True,
+                search_sleep_s=float(payload["search_sleep_s"]),
+                employer_id=payload.get("employer_id"),
+                area=payload.get("area"),
+                experience=payload.get("experience"),
+                period=payload.get("period"),
+            )
+
+            if len(refs) > MAX_VACANCIES_PER_REQUEST:
+                raise ValueError(
+                    f"summary_auto job: {len(refs)} vacancies exceed max {MAX_VACANCIES_PER_REQUEST} "
+                    f"(raw hits: {raw_id_hits})"
+                )
+
+            # Now we know total; client can switch indeterminate -> determinate.
+            _write_status(
+                job_id,
+                status="running",
+                kind=job_kind,
+                created_at=created_at,
+                progress_done=0,
+                progress_total=len(refs),
+            )
+
+            errors, summary = compute_summary_for_refs(
+                refs=refs,
+                session=session,
+                token=token,
+                kw_top_n=int(payload["kw_top_n"]),
+                kw_max_ngram=int(payload["kw_max_ngram"]),
+                sleep_s=float(payload["sleep_s"]),
+                on_progress=on_progress,
+            )
+
+            summary["dedup"] = {
+                "input_count": raw_id_hits,
+                "unique_count": len(refs),
+                "duplicates_removed": max(0, raw_id_hits - len(refs)),
+            }
+
+            _write_status(
+                job_id,
+                status="succeeded",
+                kind=job_kind,
+                created_at=created_at,
+                finished_at=time.time(),
+                processed=summary.get("processed"),
+                warnings_count=len(errors),
+                errors_sample=errors[:10],
+                summary=summary,
+            )
+            return
 
         if job_kind == "manual":
             ref_ids: List[str] = payload["ref_ids"]
