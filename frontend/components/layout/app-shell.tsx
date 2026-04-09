@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { I18nProvider, useI18n, type Lang } from "@/lib/i18n";
@@ -126,8 +127,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         <div className="container-shell relative z-[80] flex h-16 min-h-16 flex-nowrap items-center gap-2 py-1 sm:h-20 sm:min-h-20 sm:gap-3 sm:py-0 md:h-[5.25rem] md:min-h-[5.25rem] md:overflow-x-auto md:overflow-y-hidden md:[-ms-overflow-style:none] md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden">
           <Link
             href="/"
-            className="inline-flex h-11 shrink-0 items-center truncate text-base font-semibold leading-none tracking-tight text-[var(--text)] transition hover:text-[var(--primary)] sm:text-lg md:text-xl lg:text-2xl md:h-11"
+            className="inline-flex h-11 shrink-0 items-center gap-2 truncate text-base font-semibold leading-none tracking-tight text-[var(--text)] transition hover:text-[var(--primary)] sm:text-lg md:text-xl lg:text-2xl md:h-11"
           >
+            <Image
+              src="/logo.webp"
+              alt="hhResearch"
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0 rounded-md"
+              priority
+            />
             hhResearch
           </Link>
 

@@ -45,7 +45,7 @@ export function TooltipIcon({ text, alt }: { text: string; alt: string }) {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
       >
-        <Image src="/tooltip.png" alt="" width={14} height={14} className="hh-tooltip-icon" />
+        <Image src="/tooltip.webp" alt="" width={14} height={14} className="hh-tooltip-icon" />
       </button>
       {open &&
         typeof document !== "undefined" &&
